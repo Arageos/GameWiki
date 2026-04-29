@@ -1,6 +1,7 @@
 ﻿using GameWiki.Models;
 using Microsoft.EntityFrameworkCore;
 
+
 public class GameWikiDbContext : DbContext
 {
     public GameWikiDbContext(DbContextOptions<GameWikiDbContext> options)
@@ -8,42 +9,42 @@ public class GameWikiDbContext : DbContext
     {
     }
 
-    
+
     public DbSet<Game> Games { get; set; }
     public DbSet<Genre> Genres { get; set; }
     public DbSet<Platform> Platforms { get; set; }
 
-    
+
     public DbSet<GameGenre> GameGenres { get; set; }
     public DbSet<GamePlatform> GamePlatforms { get; set; }
 
-    
+
     public DbSet<User> Users { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<UserRole> UserRoles { get; set; }
 
-    
+
     public DbSet<Review> Reviews { get; set; }
 
-    
+
     public DbSet<Article> Articles { get; set; }
     public DbSet<Section> Sections { get; set; }
 
-    
+
     public DbSet<Comment> Comments { get; set; }
 
-    
+
     public DbSet<FavoriteList> FavoriteLists { get; set; }
     public DbSet<FavoriteGame> FavoriteGames { get; set; }
 
-    
+
     public DbSet<Image> Images { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        
+
         modelBuilder.Entity<GameGenre>()
             .HasKey(x => new { x.GameId, x.GenreId });
 
@@ -57,7 +58,7 @@ public class GameWikiDbContext : DbContext
             .WithMany(x => x.GameGenres)
             .HasForeignKey(x => x.GenreId);
 
-        
+
         modelBuilder.Entity<GamePlatform>()
             .HasKey(x => new { x.GameId, x.PlatformId });
 
@@ -71,7 +72,7 @@ public class GameWikiDbContext : DbContext
             .WithMany(x => x.GamePlatforms)
             .HasForeignKey(x => x.PlatformId);
 
-        
+
         modelBuilder.Entity<UserRole>()
             .HasKey(x => new { x.UserId, x.RoleId });
 
@@ -85,18 +86,18 @@ public class GameWikiDbContext : DbContext
             .WithMany()
             .HasForeignKey(x => x.RoleId);
 
-        
+
         modelBuilder.Entity<FavoriteGame>()
             .HasKey(x => new { x.FavoriteListId, x.GameId });
 
-        
+
         modelBuilder.Entity<Comment>()
             .HasOne(c => c.ParentComment)
             .WithMany()
             .HasForeignKey(c => c.ParentCommentId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        
+
         modelBuilder.Entity<Review>()
             .HasOne(r => r.Game)
             .WithMany()
@@ -107,13 +108,13 @@ public class GameWikiDbContext : DbContext
             .WithMany(u => u.Reviews)
             .HasForeignKey(r => r.UserId);
 
-        
+
         modelBuilder.Entity<Article>()
             .HasOne(a => a.Game)
             .WithMany()
             .HasForeignKey(a => a.GameId);
 
-        
+
         modelBuilder.Entity<Section>()
             .HasOne(s => s.Article)
             .WithMany()

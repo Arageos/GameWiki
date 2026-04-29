@@ -1,0 +1,11 @@
+﻿@model GameWiki.DTOs.Game.GameDto
+
+<h1>Details</h1>
+
+<div>
+    <p><b>Title:</b> @Model.Title</p>
+    <p><b>Description:</b> @Model.Description</p>
+    <p><b>Release Date:</b> @Model.ReleaseDate.ToString("yyyy-MM-dd")</p>
+</div>
+
+<a asp-action="Index">Back</a>

@@ -1,0 +1,26 @@
+﻿@model GameWiki.DTOs.Game.UpdateGameDto
+
+<h1>Edit Game</h1>
+
+<form asp-action="Edit">
+
+    <input type="hidden" asp-for="Id" />
+
+    <div>
+        <label asp-for="Title"></label>
+        <input asp-for="Title" class="form-control" />
+    </div>
+
+    <div>
+        <label asp-for="Description"></label>
+        <input asp-for="Description" class="form-control" />
+    </div>
+
+    <div>
+        <label asp-for="ReleaseDate"></label>
+        <input asp-for="ReleaseDate" class="form-control" type="date"/>
+    </div>
+
+    <button type="submit">Save</button>
+
+</form>

@@ -1,0 +1,17 @@
+﻿@model GameWiki.DTOs.Game.GameDto
+
+<h1>Delete</h1>
+
+<h3>Are you sure?</h3>
+
+<div>
+    <p>@Model.Title</p>
+    <p>@Model.Description</p>
+</div>
+
+<form asp-action="Delete">
+    <input type="hidden" asp-for="Id" />
+    <button type="submit">Delete</button>
+</form>
+
+<a asp-action="Index">Back</a>
