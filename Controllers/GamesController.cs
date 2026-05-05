@@ -14,7 +14,7 @@ namespace GameWiki.Controllers
             _context = context;
         }
 
-        // GET: Games
+        
         public async Task<IActionResult> Index()
         {
             var games = await _context.Games
@@ -30,7 +30,7 @@ namespace GameWiki.Controllers
             return View(games);
         }
 
-        // GET: Games/Details/5
+        
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null) return NotFound();
@@ -51,13 +51,13 @@ namespace GameWiki.Controllers
             return View(game);
         }
 
-        // GET: Games/Create
+        
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: Games/Create
+        
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(CreateGameDto dto)
@@ -78,7 +78,7 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // GET: Games/Edit/5
+        
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null) return NotFound();
@@ -98,7 +98,7 @@ namespace GameWiki.Controllers
             return View(dto);
         }
 
-        // POST: Games/Edit/5
+        
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, UpdateGameDto dto)
@@ -121,7 +121,7 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // GET: Games/Delete/5
+        
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null) return NotFound();
@@ -142,7 +142,7 @@ namespace GameWiki.Controllers
             return View(game);
         }
 
-        // POST: Games/Delete/5
+        
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
