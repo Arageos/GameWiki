@@ -1,8 +1,150 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Strona główna";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<!-- HERO SECTION -->
+<div class="gw-hero">
+    <div class="gw-hero-content">
+        <div class="gw-hero-badge">🎮 Encyklopedia Gier</div>
+        <h1 class="gw-hero-title">Odkryj świat<br><span class="gw-hero-accent">gier komputerowych</span></h1>
+        <p class="gw-hero-subtitle">
+            Przeglądaj tysiące gier, czytaj artykuły, pisz recenzje
+            i twórz własne listy ulubionych.
+        </p>
+        <div class="gw-hero-actions">
+            <a asp-controller="Games" asp-action="Index" class="gw-btn-primary">
+                Przeglądaj gry
+            </a>
+            <a asp-controller="Account" asp-action="Register" class="gw-btn-outline">
+                Dołącz do społeczności
+            </a>
+        </div>
+        <div class="gw-hero-stats">
+            <div class="gw-stat">
+                <span class="gw-stat-number">500+</span>
+                <span class="gw-stat-label">Gier</span>
+            </div>
+            <div class="gw-stat-divider"></div>
+            <div class="gw-stat">
+                <span class="gw-stat-number">1200+</span>
+                <span class="gw-stat-label">Artykułów</span>
+            </div>
+            <div class="gw-stat-divider"></div>
+            <div class="gw-stat">
+                <span class="gw-stat-number">3800+</span>
+                <span class="gw-stat-label">Recenzji</span>
+            </div>
+        </div>
+    </div>
+    <div class="gw-hero-visual">
+        <div class="gw-hero-card gw-card-1">
+            <div class="gw-hcard-icon">⚔️</div>
+            <div class="gw-hcard-title">RPG</div>
+            <div class="gw-hcard-sub">Otwarte światy</div>
+        </div>
+        <div class="gw-hero-card gw-card-2">
+            <div class="gw-hcard-icon">🏎️</div>
+            <div class="gw-hcard-title">Racing</div>
+            <div class="gw-hcard-sub">Wyścigi</div>
+        </div>
+        <div class="gw-hero-card gw-card-3">
+            <div class="gw-hcard-icon">🔫</div>
+            <div class="gw-hcard-title">Shooter</div>
+            <div class="gw-hcard-sub">FPS & TPS</div>
+        </div>
+        <div class="gw-hero-card gw-card-4">
+            <div class="gw-hcard-icon">🧩</div>
+            <div class="gw-hcard-title">Puzzle</div>
+            <div class="gw-hcard-sub">Łamigłówki</div>
+        </div>
+        <div class="gw-hero-orb"></div>
+    </div>
 </div>
+
+<!-- SEKCJA: PRZEGLĄDAJ WEDŁUG GATUNKU -->
+<section class="gw-section">
+    <div class="gw-section-header">
+        <h2 class="gw-section-title">Przeglądaj według gatunku</h2>
+        <p class="gw-section-sub">Znajdź gry dopasowane do swoich upodobań</p>
+    </div>
+    <div class="gw-genres-grid">
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">⚔️</span>
+            <span class="gw-genre-name">RPG</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">🔫</span>
+            <span class="gw-genre-name">Shooter</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">⚽</span>
+            <span class="gw-genre-name">Sport</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">🧩</span>
+            <span class="gw-genre-name">Puzzle</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">🏎️</span>
+            <span class="gw-genre-name">Racing</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">👻</span>
+            <span class="gw-genre-name">Horror</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">🛸</span>
+            <span class="gw-genre-name">Sci-Fi</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">🗺️</span>
+            <span class="gw-genre-name">Adventure</span>
+        </a>
+    </div>
+</section>
+
+<!-- SEKCJA: DLACZEGO GAMEWIKI -->
+<section class="gw-section gw-features-section">
+    <div class="gw-section-header">
+        <h2 class="gw-section-title">Dlaczego GameWiki?</h2>
+        <p class="gw-section-sub">Wszystko czego potrzebujesz w jednym miejscu</p>
+    </div>
+    <div class="gw-features-grid">
+        <div class="gw-feature-card">
+            <div class="gw-feature-icon">📚</div>
+            <h3 class="gw-feature-title">Obszerna baza wiedzy</h3>
+            <p class="gw-feature-desc">Szczegółowe artykuły o fabule, rozgrywce i historii każdej gry, tworzone przez społeczność.</p>
+        </div>
+        <div class="gw-feature-card">
+            <div class="gw-feature-icon">⭐</div>
+            <h3 class="gw-feature-title">Recenzje i oceny</h3>
+            <p class="gw-feature-desc">Prawdziwe opinie graczy. Pisz własne recenzje i czytaj co myślą inni o twoich ulubionych tytułach.</p>
+        </div>
+        <div class="gw-feature-card">
+            <div class="gw-feature-icon">🗂️</div>
+            <h3 class="gw-feature-title">Własne listy</h3>
+            <p class="gw-feature-desc">Twórz spersonalizowane listy gier — chcę zagrać, już grałem, polecam znajomym.</p>
+        </div>
+        <div class="gw-feature-card">
+            <div class="gw-feature-icon">🛡️</div>
+            <h3 class="gw-feature-title">Moderowana treść</h3>
+            <p class="gw-feature-desc">Moderatorzy dbają o jakość i wiarygodność informacji publikowanych w serwisie.</p>
+        </div>
+    </div>
+</section>
+
+<!-- SEKCJA: CTA -->
+<section class="gw-cta-section">
+    <div class="gw-cta-content">
+        <h2 class="gw-cta-title">Gotowy, żeby zacząć?</h2>
+        <p class="gw-cta-sub">Dołącz do społeczności graczy. Rejestracja jest bezpłatna.</p>
+        <div class="gw-cta-actions">
+            <a asp-controller="Account" asp-action="Register" class="gw-btn-primary">
+                Zarejestruj się za darmo
+            </a>
+            <a asp-controller="Games" asp-action="Index" class="gw-btn-ghost">
+                Przeglądaj bez konta →
+            </a>
+        </div>
+    </div>
+</section>
