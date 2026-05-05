@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using GameWiki.Models;
 using GameWiki.DTOs.Game;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GameWiki.Controllers
 {
@@ -51,7 +52,7 @@ namespace GameWiki.Controllers
             return View(game);
         }
 
-        
+        [Authorize(Roles = "Admin,Moderator")]
         public IActionResult Create()
         {
             return View();
@@ -60,6 +61,7 @@ namespace GameWiki.Controllers
         
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,Moderator")]
         public async Task<IActionResult> Create(CreateGameDto dto)
         {
             if (!ModelState.IsValid)
@@ -78,7 +80,7 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        
+        [Authorize(Roles = "Admin,Moderator")]
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null) return NotFound();
@@ -101,6 +103,7 @@ namespace GameWiki.Controllers
         
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,Moderator")]
         public async Task<IActionResult> Edit(int id, UpdateGameDto dto)
         {
             if (id != dto.Id) return NotFound();
@@ -121,7 +124,7 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        
+        [Authorize(Roles = "Admin,Moderator")]
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null) return NotFound();
@@ -145,6 +148,7 @@ namespace GameWiki.Controllers
         
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = "Admin,Moderator")]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var game = await _context.Games.FindAsync(id);

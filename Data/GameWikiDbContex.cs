@@ -4,8 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 public class GameWikiDbContext : DbContext
 {
-    public GameWikiDbContext(DbContextOptions<GameWikiDbContext> options)
-        : base(options)
+    public GameWikiDbContext(DbContextOptions<GameWikiDbContext> options) : base(options)
     {
     }
 
@@ -122,10 +121,10 @@ public class GameWikiDbContext : DbContext
 
 
         modelBuilder.Entity<Image>()
-    .HasOne<Game>()
-    .WithMany()
-    .HasForeignKey(i => i.GameId)
-    .OnDelete(DeleteBehavior.NoAction);
+            .HasOne<Game>()
+            .WithMany()
+            .HasForeignKey(i => i.GameId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<Image>()
             .HasOne<Article>()

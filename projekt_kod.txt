@@ -1,0 +1,1499 @@
+﻿====== AccountController.cs ======
+using GameWiki.DTOs.Auth;
+using GameWiki.Models;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+
+namespace GameWiki.Controllers
+{
+    public class AccountController : Controller
+    {
+        private readonly GameWikiDbContext _context;
+
+        public AccountController(GameWikiDbContext context)
+        {
+            _context = context;
+        }
+
+        // GET: Account/Register
+        public IActionResult Register()
+        {
+            if (User.Identity?.IsAuthenticated == true)
+                return RedirectToAction("Index", "Home");
+
+            return View();
+        }
+
+        // POST: Account/Register
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Register(RegisterDto dto)
+        {
+            if (!ModelState.IsValid)
+                return View(dto);
+
+            // Sprawdź czy email już istnieje
+            if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
+            {
+                ModelState.AddModelError("Email", "Ten email jest już zajęty");
+                return View(dto);
+            }
+
+            // Sprawdź czy nazwa użytkownika już istnieje
+            if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
+            {
+                ModelState.AddModelError("Username", "Ta nazwa użytkownika jest już zajęta");
+                return View(dto);
+            }
+
+            // Pobierz lub utwórz rolę "User"
+            var userRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "User");
+            if (userRole == null)
+            {
+                userRole = new Role { Name = "User" };
+                _context.Roles.Add(userRole);
+                await _context.SaveChangesAsync();
+            }
+
+            // Utwórz użytkownika
+            var user = new User
+            {
+                Username = dto.Username,
+                Email = dto.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            // Przypisz rolę
+            _context.UserRoles.Add(new UserRole
+            {
+                UserId = user.Id,
+                RoleId = userRole.Id
+            });
+            await _context.SaveChangesAsync();
+
+            // Zaloguj od razu po rejestracji
+            await SignInUser(user, userRole.Name, false);
+
+            return RedirectToAction("Index", "Home");
+        }
+
+        // GET: Account/Login
+        public IActionResult Login(string? returnUrl = null)
+        {
+            if (User.Identity?.IsAuthenticated == true)
+                return RedirectToAction("Index", "Home");
+
+            ViewData["ReturnUrl"] = returnUrl;
+            return View();
+        }
+
+        // POST: Account/Login
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Login(LoginDto dto, string? returnUrl = null)
+        {
+            if (!ModelState.IsValid)
+                return View(dto);
+
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == dto.Email);
+
+            if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+            {
+                ModelState.AddModelError(string.Empty, "Nieprawidłowy email lub hasło");
+                return View(dto);
+            }
+
+            // Pobierz rolę użytkownika
+            var userRole = await _context.UserRoles
+                .Include(ur => ur.Role)
+                .Where(ur => ur.UserId == user.Id)
+                .Select(ur => ur.Role.Name)
+                .FirstOrDefaultAsync() ?? "User";
+
+            await SignInUser(user, userRole, dto.RememberMe);
+
+            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                return Redirect(returnUrl);
+
+            return RedirectToAction("Index", "Home");
+        }
+
+        // POST: Account/Logout
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Logout()
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction("Index", "Home");
+        }
+
+        // GET: Account/AccessDenied
+        public IActionResult AccessDenied()
+        {
+            return View();
+        }
+
+        // Pomocnicza metoda do logowania
+        private async Task SignInUser(User user, string role, bool rememberMe)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, role)
+            };
+
+            var claimsIdentity = new ClaimsIdentity(
+                claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+            var authProperties = new AuthenticationProperties
+            {
+                IsPersistent = rememberMe,
+                ExpiresUtc = rememberMe
+                    ? DateTimeOffset.UtcNow.AddDays(30)
+                    : DateTimeOffset.UtcNow.AddHours(8)
+            };
+
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(claimsIdentity),
+                authProperties);
+        }
+    }
+}
+
+====== GamesController.cs ======
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using GameWiki.Models;
+using GameWiki.DTOs.Game;
+
+namespace GameWiki.Controllers
+{
+    public class GamesController : Controller
+    {
+        private readonly GameWikiDbContext _context;
+
+        public GamesController(GameWikiDbContext context)
+        {
+            _context = context;
+        }
+
+        
+        public async Task<IActionResult> Index()
+        {
+            var games = await _context.Games
+                .Select(g => new GameDto
+                {
+                    Id = g.Id,
+                    Title = g.Title,
+                    Description = g.Description,
+                    ReleaseDate = g.ReleaseDate
+                })
+                .ToListAsync();
+
+            return View(games);
+        }
+
+        
+        public async Task<IActionResult> Details(int? id)
+        {
+            if (id == null) return NotFound();
+
+            var game = await _context.Games
+                .Where(g => g.Id == id)
+                .Select(g => new GameDto
+                {
+                    Id = g.Id,
+                    Title = g.Title,
+                    Description = g.Description,
+                    ReleaseDate = g.ReleaseDate
+                })
+                .FirstOrDefaultAsync();
+
+            if (game == null) return NotFound();
+
+            return View(game);
+        }
+
+        
+        public IActionResult Create()
+        {
+            return View();
+        }
+
+        
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(CreateGameDto dto)
+        {
+            if (!ModelState.IsValid)
+                return View(dto);
+
+            var game = new Game
+            {
+                Title = dto.Title,
+                Description = dto.Description,
+                ReleaseDate = dto.ReleaseDate
+            };
+
+            _context.Add(game);
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        
+        public async Task<IActionResult> Edit(int? id)
+        {
+            if (id == null) return NotFound();
+
+            var game = await _context.Games.FindAsync(id);
+
+            if (game == null) return NotFound();
+
+            var dto = new UpdateGameDto
+            {
+                Id = game.Id,
+                Title = game.Title,
+                Description = game.Description,
+                ReleaseDate = game.ReleaseDate
+            };
+
+            return View(dto);
+        }
+
+        
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, UpdateGameDto dto)
+        {
+            if (id != dto.Id) return NotFound();
+
+            if (!ModelState.IsValid)
+                return View(dto);
+
+            var game = await _context.Games.FindAsync(id);
+
+            if (game == null) return NotFound();
+
+            game.Title = dto.Title;
+            game.Description = dto.Description;
+            game.ReleaseDate = dto.ReleaseDate;
+
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        
+        public async Task<IActionResult> Delete(int? id)
+        {
+            if (id == null) return NotFound();
+
+            var game = await _context.Games
+                .Where(g => g.Id == id)
+                .Select(g => new GameDto
+                {
+                    Id = g.Id,
+                    Title = g.Title,
+                    Description = g.Description,
+                    ReleaseDate = g.ReleaseDate
+                })
+                .FirstOrDefaultAsync();
+
+            if (game == null) return NotFound();
+
+            return View(game);
+        }
+
+        
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(int id)
+        {
+            var game = await _context.Games.FindAsync(id);
+
+            if (game != null)
+            {
+                _context.Games.Remove(game);
+                await _context.SaveChangesAsync();
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+    }
+}
+
+====== HomeController.cs ======
+using System.Diagnostics;
+using GameWiki.Models;
+using Microsoft.AspNetCore.Mvc;
+
+namespace GameWiki.Controllers
+{
+    public class HomeController : Controller
+    {
+        private readonly ILogger<HomeController> _logger;
+
+        public HomeController(ILogger<HomeController> logger)
+        {
+            _logger = logger;
+        }
+
+        public IActionResult Index()
+        {
+            return View();
+        }
+
+        public IActionResult Privacy()
+        {
+            return View();
+        }
+
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Error()
+        {
+            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+    }
+}
+
+====== GameWikiDbContex.cs ======
+using GameWiki.Models;
+using Microsoft.EntityFrameworkCore;
+
+
+public class GameWikiDbContext : DbContext
+{
+    public GameWikiDbContext(DbContextOptions<GameWikiDbContext> options) : base(options)
+    {
+    }
+
+
+    public DbSet<Game> Games { get; set; }
+    public DbSet<Genre> Genres { get; set; }
+    public DbSet<Platform> Platforms { get; set; }
+
+
+    public DbSet<GameGenre> GameGenres { get; set; }
+    public DbSet<GamePlatform> GamePlatforms { get; set; }
+
+
+    public DbSet<User> Users { get; set; }
+    public DbSet<Role> Roles { get; set; }
+    public DbSet<UserRole> UserRoles { get; set; }
+
+
+    public DbSet<Review> Reviews { get; set; }
+
+
+    public DbSet<Article> Articles { get; set; }
+    public DbSet<Section> Sections { get; set; }
+
+
+    public DbSet<Comment> Comments { get; set; }
+
+
+    public DbSet<FavoriteList> FavoriteLists { get; set; }
+    public DbSet<FavoriteGame> FavoriteGames { get; set; }
+
+
+    public DbSet<Image> Images { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+
+        modelBuilder.Entity<GameGenre>()
+            .HasKey(x => new { x.GameId, x.GenreId });
+
+        modelBuilder.Entity<GameGenre>()
+            .HasOne(x => x.Game)
+            .WithMany(x => x.GameGenres)
+            .HasForeignKey(x => x.GameId);
+
+        modelBuilder.Entity<GameGenre>()
+            .HasOne(x => x.Genre)
+            .WithMany(x => x.GameGenres)
+            .HasForeignKey(x => x.GenreId);
+
+
+        modelBuilder.Entity<GamePlatform>()
+            .HasKey(x => new { x.GameId, x.PlatformId });
+
+        modelBuilder.Entity<GamePlatform>()
+            .HasOne(x => x.Game)
+            .WithMany(x => x.GamePlatforms)
+            .HasForeignKey(x => x.GameId);
+
+        modelBuilder.Entity<GamePlatform>()
+            .HasOne(x => x.Platform)
+            .WithMany(x => x.GamePlatforms)
+            .HasForeignKey(x => x.PlatformId);
+
+
+        modelBuilder.Entity<UserRole>()
+            .HasKey(x => new { x.UserId, x.RoleId });
+
+        modelBuilder.Entity<UserRole>()
+            .HasOne(x => x.User)
+            .WithMany()
+            .HasForeignKey(x => x.UserId);
+
+        modelBuilder.Entity<UserRole>()
+            .HasOne(x => x.Role)
+            .WithMany()
+            .HasForeignKey(x => x.RoleId);
+
+
+        modelBuilder.Entity<FavoriteGame>()
+            .HasKey(x => new { x.FavoriteListId, x.GameId });
+
+
+        modelBuilder.Entity<Comment>()
+            .HasOne(c => c.ParentComment)
+            .WithMany()
+            .HasForeignKey(c => c.ParentCommentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+
+        modelBuilder.Entity<Review>()
+            .HasOne(r => r.Game)
+            .WithMany()
+            .HasForeignKey(r => r.GameId);
+
+        modelBuilder.Entity<Review>()
+            .HasOne(r => r.User)
+            .WithMany(u => u.Reviews)
+            .HasForeignKey(r => r.UserId);
+
+
+        modelBuilder.Entity<Article>()
+            .HasOne(a => a.Game)
+            .WithMany()
+            .HasForeignKey(a => a.GameId);
+
+
+        modelBuilder.Entity<Section>()
+            .HasOne(s => s.Article)
+            .WithMany()
+            .HasForeignKey(s => s.ArticleId);
+
+
+        modelBuilder.Entity<Image>()
+            .HasOne<Game>()
+            .WithMany()
+            .HasForeignKey(i => i.GameId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<Image>()
+            .HasOne<Article>()
+            .WithMany()
+            .HasForeignKey(i => i.ArticleId)
+            .OnDelete(DeleteBehavior.NoAction);
+    }
+}
+
+====== LoginDto.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.DTOs.Auth
+{
+    public class LoginDto
+    {
+        [Required(ErrorMessage = "Email jest wymagany")]
+        [EmailAddress(ErrorMessage = "Nieprawidłowy format email")]
+        [Display(Name = "Email")]
+        public string Email { get; set; }
+
+        [Required(ErrorMessage = "Hasło jest wymagane")]
+        [DataType(DataType.Password)]
+        [Display(Name = "Hasło")]
+        public string Password { get; set; }
+
+        [Display(Name = "Zapamiętaj mnie")]
+        public bool RememberMe { get; set; }
+    }
+}
+
+====== RegisterDto.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.DTOs.Auth
+{
+    public class RegisterDto
+    {
+        [Required(ErrorMessage = "Nazwa użytkownika jest wymagana")]
+        [MaxLength(50)]
+        [Display(Name = "Nazwa użytkownika")]
+        public string Username { get; set; }
+
+        [Required(ErrorMessage = "Email jest wymagany")]
+        [EmailAddress(ErrorMessage = "Nieprawidłowy format email")]
+        [Display(Name = "Email")]
+        public string Email { get; set; }
+
+        [Required(ErrorMessage = "Hasło jest wymagane")]
+        [MinLength(6, ErrorMessage = "Hasło musi mieć co najmniej 6 znaków")]
+        [DataType(DataType.Password)]
+        [Display(Name = "Hasło")]
+        public string Password { get; set; }
+
+        [Required(ErrorMessage = "Potwierdzenie hasła jest wymagane")]
+        [DataType(DataType.Password)]
+        [Compare("Password", ErrorMessage = "Hasła nie są identyczne")]
+        [Display(Name = "Potwierdź hasło")]
+        public string ConfirmPassword { get; set; }
+    }
+}
+
+====== CreateGameDto.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.DTOs.Game
+{
+    public class CreateGameDto
+    {
+        [Required]
+        [MaxLength(150)]
+        public string Title { get; set; }
+
+        [Required]
+        public string Description { get; set; }
+
+        public DateTime ReleaseDate { get; set; }
+    }
+}
+
+====== GameDto.cs ======
+namespace GameWiki.DTOs.Game
+{
+    public class GameDto
+    {
+        public int Id { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public DateTime ReleaseDate { get; set; }
+    }
+}
+
+====== UpdateGameDto.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.DTOs.Game
+{
+    public class UpdateGameDto
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [MaxLength(150)]
+        public string Title { get; set; }
+
+        [Required]
+        public string Description { get; set; }
+
+        public DateTime ReleaseDate { get; set; }
+    }
+}
+
+====== Article.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.Models
+{
+    public class Article
+    {
+        public int Id { get; set; }
+        public int GameId { get; set; }
+        public Game Game { get; set; }
+
+        [Required]
+        [MaxLength(200)]
+        public string Title { get; set; }
+
+        [Required]
+        public string Content { get; set; }
+
+        public string Status { get; set; } // Draft / Approved
+    }
+}
+
+====== Comment.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.Models
+{
+    public class Comment
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public User User { get; set; }
+
+        [Required]
+        [MaxLength(2000)]
+        public string Content { get; set; }
+        public DateTime CreatedAt { get; set; }
+
+        public int? ParentCommentId { get; set; }
+        public Comment ParentComment { get; set; }
+    }
+}
+
+====== ErrorViewModel.cs ======
+namespace GameWiki.Models
+{
+    public class ErrorViewModel
+    {
+        public string? RequestId { get; set; }
+
+        public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+    }
+}
+
+====== FavoriteGame.cs ======
+namespace GameWiki.Models
+{
+    public class FavoriteGame
+    {
+        public int FavoriteListId { get; set; }
+        public int GameId { get; set; }
+    }
+}
+
+====== FavoriteList.cs ======
+namespace GameWiki.Models
+{
+    public class FavoriteList
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+
+        public string Name { get; set; }
+    }
+}
+
+====== Game.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.Models
+{
+    public class Game
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [MaxLength(150)]
+        public string Title { get; set; }
+
+        [Required]
+        [MaxLength(2000)]
+        public string Description { get; set; }
+        public DateTime ReleaseDate { get; set; }
+
+        public ICollection<GameGenre> GameGenres { get; set; }
+        public ICollection<GamePlatform> GamePlatforms { get; set; }
+    }
+}
+
+====== GameGenre.cs ======
+namespace GameWiki.Models
+{
+    public class GameGenre
+    {
+        public int GameId { get; set; }
+        public Game Game { get; set; }
+
+        public int GenreId { get; set; }
+        public Genre Genre { get; set; }
+    }
+}
+
+====== GamePlatform.cs ======
+namespace GameWiki.Models
+{
+    public class GamePlatform
+    {
+        public int GameId { get; set; }
+        public Game Game { get; set; }
+
+        public int PlatformId { get; set; }
+        public Platform Platform { get; set; }
+    }
+}
+
+====== Genre.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.Models
+{
+    public class Genre
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [MaxLength(50)]
+        public string Name { get; set; }
+
+        public ICollection<GameGenre> GameGenres { get; set; }
+    }
+}
+
+====== Images.cs ======
+namespace GameWiki.Models
+{
+    public class Image
+    {
+        public int Id { get; set; }
+        public string Url { get; set; }
+
+        public int? GameId { get; set; }
+        public int? ArticleId { get; set; }
+    }
+}
+
+====== Platform.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.Models
+{
+    public class Platform
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [MaxLength(50)]
+        public string Name { get; set; }
+
+        public ICollection<GamePlatform> GamePlatforms { get; set; }
+    }
+}
+
+====== Review.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.Models
+{
+    public class Review
+    {
+        public int Id { get; set; }
+        public int GameId { get; set; }
+        public Game Game { get; set; }
+
+        public int UserId { get; set; }
+        public User User { get; set; }
+
+        [Required]
+        [Range(1, 10)]
+        public int Rating { get; set; }
+
+        [Required]
+        [MaxLength(2000)]
+        public string Content { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+}
+
+====== Role.cs ======
+namespace GameWiki.Models
+{
+    public class Role
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+    }
+}
+
+====== Section.cs ======
+namespace GameWiki.Models
+{
+    public class Section
+    {
+        public int Id { get; set; }
+        public int ArticleId { get; set; }
+        public Article Article { get; set; }
+
+        public string Title { get; set; }
+        public string Content { get; set; }
+        public int Order { get; set; }
+    }
+}
+
+====== User.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.Models
+{
+    public class User
+    {
+        public int Id { get; set; }
+
+        [Required]
+        [MaxLength(50)]
+        public string Username { get; set; }
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; }
+
+        [Required]
+        public string PasswordHash { get; set; }
+
+        public ICollection<Review> Reviews { get; set; }
+    }
+}
+
+====== UserRole.cs ======
+namespace GameWiki.Models
+{
+    public class UserRole
+    {
+        public int UserId { get; set; }
+        public User User { get; set; }
+
+        public int RoleId { get; set; }
+        public Role Role { get; set; }
+    }
+}
+
+====== launchSettings.json ======
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5210",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7233;http://localhost:5210",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+====== AccessDenied.cshtml ======
+@{
+    ViewData["Title"] = "Brak dostępu";
+}
+
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card" style="text-align:center">
+        <div class="gw-auth-icon">🚫</div>
+        <h1 class="gw-auth-title">Brak dostępu</h1>
+        <p class="gw-auth-sub">Nie masz uprawnień do tej strony.</p>
+        <a asp-controller="Home" asp-action="Index" class="gw-btn-primary" style="display:inline-block; margin-top:1rem">
+            Wróć do strony głównej
+        </a>
+    </div>
+</div>
+
+====== Login.cshtml ======
+@model GameWiki.DTOs.Auth.LoginDto
+@{
+    ViewData["Title"] = "Logowanie";
+}
+
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card">
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">🔐</div>
+            <h1 class="gw-auth-title">Witaj z powrotem</h1>
+            <p class="gw-auth-sub">Zaloguj się do swojego konta</p>
+        </div>
+
+        <form asp-action="Login" method="post">
+            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+            <div asp-validation-summary="ModelOnly" class="gw-alert-error"></div>
+
+            <div class="gw-form-group">
+                <label asp-for="Email" class="gw-label"></label>
+                <input asp-for="Email" class="gw-input" placeholder="twoj@email.com" />
+                <span asp-validation-for="Email" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-group">
+                <label asp-for="Password" class="gw-label"></label>
+                <input asp-for="Password" class="gw-input" placeholder="Twoje hasło" />
+                <span asp-validation-for="Password" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-check">
+                <input asp-for="RememberMe" class="gw-checkbox" />
+                <label asp-for="RememberMe" class="gw-check-label">Zapamiętaj mnie</label>
+            </div>
+
+            <button type="submit" class="gw-btn-primary gw-btn-full">
+                Zaloguj się
+            </button>
+        </form>
+
+        <div class="gw-auth-footer">
+            Nie masz konta?
+            <a asp-controller="Account" asp-action="Register" class="gw-auth-link">Zarejestruj się</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
+
+====== Register.cshtml ======
+@model GameWiki.DTOs.Auth.RegisterDto
+@{
+    ViewData["Title"] = "Rejestracja";
+}
+
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card">
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">🎮</div>
+            <h1 class="gw-auth-title">Utwórz konto</h1>
+            <p class="gw-auth-sub">Dołącz do społeczności GameWiki</p>
+        </div>
+
+        <form asp-action="Register" method="post">
+            <div asp-validation-summary="ModelOnly" class="gw-alert-error"></div>
+
+            <div class="gw-form-group">
+                <label asp-for="Username" class="gw-label"></label>
+                <input asp-for="Username" class="gw-input" placeholder="Twoja nazwa użytkownika" />
+                <span asp-validation-for="Username" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-group">
+                <label asp-for="Email" class="gw-label"></label>
+                <input asp-for="Email" class="gw-input" placeholder="twoj@email.com" />
+                <span asp-validation-for="Email" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-group">
+                <label asp-for="Password" class="gw-label"></label>
+                <input asp-for="Password" class="gw-input" placeholder="Minimum 6 znaków" />
+                <span asp-validation-for="Password" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-group">
+                <label asp-for="ConfirmPassword" class="gw-label"></label>
+                <input asp-for="ConfirmPassword" class="gw-input" placeholder="Powtórz hasło" />
+                <span asp-validation-for="ConfirmPassword" class="gw-field-error"></span>
+            </div>
+
+            <button type="submit" class="gw-btn-primary gw-btn-full">
+                Zarejestruj się
+            </button>
+        </form>
+
+        <div class="gw-auth-footer">
+            Masz już konto?
+            <a asp-controller="Account" asp-action="Login" class="gw-auth-link">Zaloguj się</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
+
+====== Create.cshtml ======
+@model GameWiki.DTOs.Game.CreateGameDto
+
+<h1>Create Game</h1>
+
+<form asp-action="Create">
+
+    <div>
+        <label asp-for="Title"></label>
+        <input asp-for="Title" class="form-control" />
+    </div>
+
+    <div>
+        <label asp-for="Description"></label>
+        <input asp-for="Description" class="form-control" />
+    </div>
+
+    <div>
+        <label asp-for="ReleaseDate"></label>
+        <input asp-for="ReleaseDate" class="form-control" type="date"/>
+    </div>
+
+    <button type="submit">Create</button>
+
+</form>
+
+====== Delete.cshtml ======
+@model GameWiki.DTOs.Game.GameDto
+
+<h1>Delete</h1>
+
+<h3>Are you sure?</h3>
+
+<div>
+    <p>@Model.Title</p>
+    <p>@Model.Description</p>
+</div>
+
+<form asp-action="Delete">
+    <input type="hidden" asp-for="Id" />
+    <button type="submit">Delete</button>
+</form>
+
+<a asp-action="Index">Back</a>
+
+====== Details.cshtml ======
+@model GameWiki.DTOs.Game.GameDto
+
+<h1>Details</h1>
+
+<div>
+    <p><b>Title:</b> @Model.Title</p>
+    <p><b>Description:</b> @Model.Description</p>
+    <p><b>Release Date:</b> @Model.ReleaseDate.ToString("yyyy-MM-dd")</p>
+</div>
+
+<a asp-action="Index">Back</a>
+
+====== Edit.cshtml ======
+@model GameWiki.DTOs.Game.UpdateGameDto
+
+<h1>Edit Game</h1>
+
+<form asp-action="Edit">
+
+    <input type="hidden" asp-for="Id" />
+
+    <div>
+        <label asp-for="Title"></label>
+        <input asp-for="Title" class="form-control" />
+    </div>
+
+    <div>
+        <label asp-for="Description"></label>
+        <input asp-for="Description" class="form-control" />
+    </div>
+
+    <div>
+        <label asp-for="ReleaseDate"></label>
+        <input asp-for="ReleaseDate" class="form-control" type="date"/>
+    </div>
+
+    <button type="submit">Save</button>
+
+</form>
+
+====== Index.cshtml ======
+@model IEnumerable<GameWiki.DTOs.Game.GameDto>
+
+@{
+    ViewData["Title"] = "Games";
+}
+
+<h1>Games</h1>
+
+<p>
+    <a asp-action="Create">Create New</a>
+</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Description</th>
+            <th>Release Date</th>
+            <th></th>
+        </tr>
+    </thead>
+
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@item.Title</td>
+                <td>@item.Description</td>
+                <td>@item.ReleaseDate.ToString("yyyy-MM-dd")</td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
+                    <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
+                    <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+====== Index.cshtml ======
+@{
+    ViewData["Title"] = "Strona główna";
+}
+
+<!-- HERO SECTION -->
+<div class="gw-hero">
+    <div class="gw-hero-content">
+        <div class="gw-hero-badge">🎮 Encyklopedia Gier</div>
+        <h1 class="gw-hero-title">Odkryj świat<br><span class="gw-hero-accent">gier komputerowych</span></h1>
+        <p class="gw-hero-subtitle">
+            Przeglądaj tysiące gier, czytaj artykuły, pisz recenzje
+            i twórz własne listy ulubionych.
+        </p>
+        <div class="gw-hero-actions">
+            <a asp-controller="Games" asp-action="Index" class="gw-btn-primary">
+                Przeglądaj gry
+            </a>
+            <a asp-controller="Account" asp-action="Register" class="gw-btn-outline">
+                Dołącz do społeczności
+            </a>
+        </div>
+        <div class="gw-hero-stats">
+            <div class="gw-stat">
+                <span class="gw-stat-number">-</span>
+                <span class="gw-stat-label">Gier</span>
+            </div>
+            <div class="gw-stat-divider"></div>
+            <div class="gw-stat">
+                <span class="gw-stat-number">-</span>
+                <span class="gw-stat-label">Artykułów</span>
+            </div>
+            <div class="gw-stat-divider"></div>
+            <div class="gw-stat">
+                <span class="gw-stat-number">-</span>
+                <span class="gw-stat-label">Recenzji</span>
+            </div>
+        </div>
+    </div>
+    <div class="gw-hero-visual">
+        <div class="gw-hero-card gw-card-1">
+            <div class="gw-hcard-icon">⚔️</div>
+            <div class="gw-hcard-title">RPG</div>
+            <div class="gw-hcard-sub">Otwarte światy</div>
+        </div>
+        <div class="gw-hero-card gw-card-2">
+            <div class="gw-hcard-icon">🏎️</div>
+            <div class="gw-hcard-title">Racing</div>
+            <div class="gw-hcard-sub">Wyścigi</div>
+        </div>
+        <div class="gw-hero-card gw-card-3">
+            <div class="gw-hcard-icon">🔫</div>
+            <div class="gw-hcard-title">Shooter</div>
+            <div class="gw-hcard-sub">FPS & TPS</div>
+        </div>
+        <div class="gw-hero-card gw-card-4">
+            <div class="gw-hcard-icon">🧩</div>
+            <div class="gw-hcard-title">Puzzle</div>
+            <div class="gw-hcard-sub">Łamigłówki</div>
+        </div>
+        <div class="gw-hero-orb"></div>
+    </div>
+</div>
+
+<!-- SEKCJA: PRZEGLĄDAJ WEDŁUG GATUNKU -->
+<section class="gw-section">
+    <div class="gw-section-header">
+        <h2 class="gw-section-title">Przeglądaj według gatunku</h2>
+        <p class="gw-section-sub">Znajdź gry dopasowane do swoich upodobań</p>
+    </div>
+    <div class="gw-genres-grid">
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">⚔️</span>
+            <span class="gw-genre-name">RPG</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">🔫</span>
+            <span class="gw-genre-name">Shooter</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">⚽</span>
+            <span class="gw-genre-name">Sport</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">🧩</span>
+            <span class="gw-genre-name">Puzzle</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">🏎️</span>
+            <span class="gw-genre-name">Racing</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">👻</span>
+            <span class="gw-genre-name">Horror</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">🛸</span>
+            <span class="gw-genre-name">Sci-Fi</span>
+        </a>
+        <a href="#" class="gw-genre-card">
+            <span class="gw-genre-icon">🗺️</span>
+            <span class="gw-genre-name">Adventure</span>
+        </a>
+    </div>
+</section>
+
+<!-- SEKCJA: DLACZEGO GAMEWIKI -->
+<section class="gw-section gw-features-section">
+    <div class="gw-section-header">
+        <h2 class="gw-section-title">Dlaczego GameWiki?</h2>
+        <p class="gw-section-sub">Wszystko czego potrzebujesz w jednym miejscu</p>
+    </div>
+    <div class="gw-features-grid">
+        <div class="gw-feature-card">
+            <div class="gw-feature-icon">📚</div>
+            <h3 class="gw-feature-title">Obszerna baza wiedzy</h3>
+            <p class="gw-feature-desc">Szczegółowe artykuły o fabule, rozgrywce i historii każdej gry, tworzone przez społeczność.</p>
+        </div>
+        <div class="gw-feature-card">
+            <div class="gw-feature-icon">⭐</div>
+            <h3 class="gw-feature-title">Recenzje i oceny</h3>
+            <p class="gw-feature-desc">Prawdziwe opinie graczy. Pisz własne recenzje i czytaj co myślą inni o twoich ulubionych tytułach.</p>
+        </div>
+        <div class="gw-feature-card">
+            <div class="gw-feature-icon">🗂️</div>
+            <h3 class="gw-feature-title">Własne listy</h3>
+            <p class="gw-feature-desc">Twórz spersonalizowane listy gier — chcę zagrać, już grałem, polecam znajomym.</p>
+        </div>
+        <div class="gw-feature-card">
+            <div class="gw-feature-icon">🛡️</div>
+            <h3 class="gw-feature-title">Moderowana treść</h3>
+            <p class="gw-feature-desc">Moderatorzy dbają o jakość i wiarygodność informacji publikowanych w serwisie.</p>
+        </div>
+    </div>
+</section>
+
+<!-- SEKCJA: CTA -->
+<section class="gw-cta-section">
+    <div class="gw-cta-content">
+        <h2 class="gw-cta-title">Gotowy, żeby zacząć?</h2>
+        <p class="gw-cta-sub">Dołącz do społeczności graczy. Rejestracja jest bezpłatna.</p>
+        <div class="gw-cta-actions">
+            <a asp-controller="Account" asp-action="Register" class="gw-btn-primary">
+                Zarejestruj się za darmo
+            </a>
+            <a asp-controller="Games" asp-action="Index" class="gw-btn-ghost">
+                Przeglądaj bez konta →
+            </a>
+        </div>
+    </div>
+</section>
+
+====== Privacy.cshtml ======
+@{
+    ViewData["Title"] = "Privacy Policy";
+}
+<h1>@ViewData["Title"]</h1>
+
+<p>Use this page to detail your site's privacy policy.</p>
+
+====== Error.cshtml ======
+@model ErrorViewModel
+@{
+    ViewData["Title"] = "Error";
+}
+
+<h1 class="text-danger">Error.</h1>
+<h2 class="text-danger">An error occurred while processing your request.</h2>
+
+@if (Model.ShowRequestId)
+{
+    <p>
+        <strong>Request ID:</strong> <code>@Model.RequestId</code>
+    </p>
+}
+
+<h3>Development Mode</h3>
+<p>
+    Swapping to <strong>Development</strong> environment will display more detailed information about the error that occurred.
+</p>
+<p>
+    <strong>The Development environment shouldn't be enabled for deployed applications.</strong>
+    It can result in displaying sensitive information from exceptions to end users.
+    For local debugging, enable the <strong>Development</strong> environment by setting the <strong>ASPNETCORE_ENVIRONMENT</strong> environment variable to <strong>Development</strong>
+    and restarting the app.
+</p>
+
+====== _Layout.cshtml ======
+<!DOCTYPE html>
+<html lang="pl" style="height: 100%;">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - GameWiki</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/GameWiki.styles.css" asp-append-version="true" />
+</head>
+<body style="min-height: 100vh; display: flex; flex-direction: column; margin: 0; background-color: #0f1117; color: #e2e8f0;">
+
+    <nav class="navbar navbar-expand-sm navbar-toggleable-sm" style="flex-shrink: 0;">
+        <div class="container">
+            <a class="navbar-brand" asp-controller="Home" asp-action="Index">GameWiki</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                    data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                    aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                <ul class="navbar-nav flex-grow-1">
+                    <li class="nav-item">
+                        <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" asp-controller="Games" asp-action="Index">Gry</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <li class="nav-item nav-username">
+                            👤 @User.Identity.Name
+                            @if (User.IsInRole("Moderator"))
+                            {
+                                <span class="nav-badge-mod">MOD</span>
+                            }
+                        </li>
+                        <li class="nav-item">
+                            <form asp-controller="Account" asp-action="Logout" method="post" style="margin:0">
+                                <button type="submit" class="nav-link nav-logout-btn">Wyloguj</button>
+                            </form>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Account" asp-action="Login">Logowanie</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-btn-register" asp-controller="Account" asp-action="Register">Rejestracja</a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="flex: 1 0 auto; padding-bottom: 2rem;">
+        <main role="main">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer style="flex-shrink: 0; background: rgba(15, 17, 23, 0.95); border-top: 1px solid rgba(255,255,255,0.07); color: #475569; padding: 1.5rem 0;">
+        <div class="container">
+            &copy; 2026 - GameWiki
+        </div>
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
+
+====== _ValidationScriptsPartial.cshtml ======
+<script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+<script src="~/lib/jquery-validation-unobtrusive/dist/jquery.validate.unobtrusive.min.js"></script>
+
+====== _ViewImports.cshtml ======
+@using GameWiki
+@using GameWiki.Models
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+====== _ViewStart.cshtml ======
+@{
+    Layout = "_Layout";
+}
+
+====== appsettings.Development.json ======
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
+
+====== appsettings.json ======
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=GameWikiDb;Trusted_Connection=True;"
+  },
+  "AllowedHosts": "*"
+}
+
+====== Program.cs ======
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.Cookies;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllersWithViews();
+
+builder.Services.AddDbContext<GameWikiDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Autentykacja przez Cookie + ClaimsIdentity
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Account/Login";
+        options.LogoutPath = "/Account/Logout";
+        options.AccessDeniedPath = "/Account/AccessDenied";
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+    });
+
+builder.Services.AddAuthorization();
+
+var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseRouting();
+
+app.UseAuthentication(); // MUSI być przed UseAuthorization
+app.UseAuthorization();
+
+app.MapStaticAssets();
+
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}")
+    .WithStaticAssets();
+
+app.Run();
+

@@ -37,6 +37,10 @@
                             {
                                 <span class="nav-badge-mod">MOD</span>
                             }
+                            else if (User.IsInRole("Admin"))
+                            {
+                                <span class="nav-badge-mod">ADMIN</span>
+                            }
                         </li>
                         <li class="nav-item">
                             <form asp-controller="Account" asp-action="Logout" method="post" style="margin:0">
