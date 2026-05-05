@@ -1,0 +1,51 @@
+﻿@model GameWiki.DTOs.Auth.LoginDto
+@{
+    ViewData["Title"] = "Logowanie";
+}
+
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card">
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">🔐</div>
+            <h1 class="gw-auth-title">Witaj z powrotem</h1>
+            <p class="gw-auth-sub">Zaloguj się do swojego konta</p>
+        </div>
+
+        <form asp-action="Login" method="post">
+            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+            <div asp-validation-summary="ModelOnly" class="gw-alert-error"></div>
+
+            <div class="gw-form-group">
+                <label asp-for="Email" class="gw-label"></label>
+                <input asp-for="Email" class="gw-input" placeholder="twoj@email.com" />
+                <span asp-validation-for="Email" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-group">
+                <label asp-for="Password" class="gw-label"></label>
+                <input asp-for="Password" class="gw-input" placeholder="Twoje hasło" />
+                <span asp-validation-for="Password" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-check">
+                <input asp-for="RememberMe" class="gw-checkbox" />
+                <label asp-for="RememberMe" class="gw-check-label">Zapamiętaj mnie</label>
+            </div>
+
+            <button type="submit" class="gw-btn-primary gw-btn-full">
+                Zaloguj się
+            </button>
+        </form>
+
+        <div class="gw-auth-footer">
+            Nie masz konta?
+            <a asp-controller="Account" asp-action="Register" class="gw-auth-link">Zarejestruj się</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
