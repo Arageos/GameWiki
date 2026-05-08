@@ -27,6 +27,9 @@
                     <li class="nav-item">
                         <a class="nav-link" asp-controller="Games" asp-action="Index">Gry</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" asp-controller="GamesImport" asp-action="Index">RAWG</a>
+                    </li>
                 </ul>
                 <ul class="navbar-nav">
                     @if (User.Identity?.IsAuthenticated == true)

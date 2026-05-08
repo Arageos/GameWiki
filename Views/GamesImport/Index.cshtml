@@ -1,0 +1,90 @@
+﻿@using GameWiki.Services
+@model List<RawgGameListItem>
+@{
+    ViewData["Title"] = "Import z RAWG";
+    int currentPage = (int)ViewBag.Page;
+    string search = (string)ViewBag.Search ?? "";
+    bool hasNext = (bool)ViewBag.HasNext;
+}
+
+<div class="gw-section">
+    <div class="gw-section-header" style="text-align:left; margin-bottom:1.5rem;">
+        <h1 class="gw-section-title">📥 Import z RAWG</h1>
+        <p class="gw-section-sub">Wyszukaj i dodaj gry do swojej bazy</p>
+    </div>
+
+    @if (TempData["ImportSuccess"] != null)
+    {
+        <div style="background:rgba(52,211,153,0.1); border:1px solid rgba(52,211,153,0.3);
+                    border-radius:10px; padding:0.8rem 1rem; color:#34d399;
+                    margin-bottom:1.2rem; font-size:0.9rem;">
+            ✔ @TempData["ImportSuccess"]
+        </div>
+    }
+    @if (TempData["ImportError"] != null)
+    {
+        <div class="gw-alert-error">⚠ @TempData["ImportError"]</div>
+    }
+
+    @* Wyszukiwarka *@
+    <form asp-action="Index" method="get" style="display:flex; gap:0.8rem; margin-bottom:1.5rem;">
+        <input type="text" name="search" value="@search" class="gw-input"
+               placeholder="Szukaj gry..." style="max-width:360px;" />
+        <button type="submit" class="gw-btn-primary" style="padding:0.7rem 1.4rem;">
+            🔍 Szukaj
+        </button>
+        @if (!string.IsNullOrEmpty(search))
+        {
+            <a asp-action="Index" class="gw-btn-outline">✕ Wyczyść</a>
+        }
+    </form>
+
+    <div class="gw-table-wrapper">
+        <table class="gw-table">
+            <thead>
+                <tr>
+                    <th>Tytuł</th>
+                    <th>Gatunki</th>
+                    <th>Data premiery</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var game in Model)
+                {
+                    <tr>
+                        <td class="gw-td-title">@game.Name</td>
+                        <td class="gw-td-desc" style="font-size:0.82rem;">
+                            @(game.Genres != null ? string.Join(", ", game.Genres.Select(g => g.Name)) : "—")
+                        </td>
+                        <td class="gw-td-date">@(game.Released ?? "—")</td>
+                        <td class="gw-td-actions">
+                            <form asp-action="Import" method="post" style="display:inline;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="rawgId" value="@game.Id" />
+                                <button type="submit" class="gw-action-link gw-action-edit"
+                                        style="background:none; border:none; cursor:pointer; font-size:0.83rem;">
+                                    + Importuj
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div style="display:flex; gap:1rem; margin-top:1.5rem; align-items:center;">
+        @if (currentPage > 1)
+        {
+            <a asp-action="Index" asp-route-page="@(currentPage - 1)" asp-route-search="@search"
+               class="gw-btn-outline">← Poprzednia</a>
+        }
+        <span style="color:#64748b; font-size:0.85rem;">Strona @currentPage</span>
+        @if (hasNext)
+        {
+            <a asp-action="Index" asp-route-page="@(currentPage + 1)" asp-route-search="@search"
+               class="gw-btn-primary">Następna →</a>
+        }
+    </div>
+</div>
