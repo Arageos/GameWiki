@@ -1,11 +1,45 @@
 ﻿@model GameWiki.DTOs.Game.GameDto
+@{
+    ViewData["Title"] = "Szczegóły gry";
+}
 
-<h1>Details</h1>
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card" style="max-width: 560px;">
 
-<div>
-    <p><b>Title:</b> @Model.Title</p>
-    <p><b>Description:</b> @Model.Description</p>
-    <p><b>Release Date:</b> @Model.ReleaseDate.ToString("yyyy-MM-dd")</p>
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">🎮</div>
+            <h1 class="gw-auth-title">@Model.Title</h1>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:1rem; margin-bottom:2rem;">
+
+            <div style="background: rgba(15,17,23,0.6); border:1px solid rgba(255,255,255,0.07);
+                        border-radius:12px; padding:1rem 1.2rem;">
+                <span class="gw-label" style="margin-bottom:0.3rem;">Opis</span>
+                <p style="color:#cbd5e1; margin:0; font-size:0.95rem; line-height:1.6;">
+                    @Model.Description
+                </p>
+            </div>
+
+            <div style="background: rgba(15,17,23,0.6); border:1px solid rgba(255,255,255,0.07);
+                        border-radius:12px; padding:1rem 1.2rem;">
+                <span class="gw-label" style="margin-bottom:0.3rem;">Data premiery</span>
+                <p style="color:#a78bfa; margin:0; font-weight:700; font-size:1rem;">
+                    @Model.ReleaseDate.ToString("yyyy-MM-dd")
+                </p>
+            </div>
+
+        </div>
+
+        <div style="display:flex; gap:0.8rem;">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="gw-btn-primary gw-btn-full"
+               style="text-align:center;">
+                ✏️ Edytuj
+            </a>
+            <a asp-action="Index" class="gw-btn-outline gw-btn-full" style="text-align:center;">
+                ← Wróć
+            </a>
+        </div>
+
+    </div>
 </div>
-
-<a asp-action="Index">Back</a>

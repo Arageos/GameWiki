@@ -1,38 +1,47 @@
 ﻿@model IEnumerable<GameWiki.DTOs.Game.GameDto>
-
 @{
     ViewData["Title"] = "Games";
 }
 
-<h1>Games</h1>
+<div class="gw-section">
+    <div class="gw-section-header" style="text-align:left; margin-bottom:1.5rem;">
+        <h1 class="gw-section-title">🎮 Games</h1>
+        <p class="gw-section-sub">Przeglądaj i zarządzaj bazą gier</p>
+    </div>
 
-<p>
-    <a asp-action="Create">Create New</a>
-</p>
+    <div style="margin-bottom:1.2rem;">
+        <a asp-action="Create" class="gw-btn-primary" style="font-size:0.9rem; padding:0.55rem 1.3rem;">
+            + Dodaj grę
+        </a>
+    </div>
 
-<table class="table">
-    <thead>
-        <tr>
-            <th>Title</th>
-            <th>Description</th>
-            <th>Release Date</th>
-            <th></th>
-        </tr>
-    </thead>
-
-    <tbody>
-        @foreach (var item in Model)
-        {
-            <tr>
-                <td>@item.Title</td>
-                <td>@item.Description</td>
-                <td>@item.ReleaseDate.ToString("yyyy-MM-dd")</td>
-                <td>
-                    <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
-                    <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
-                    <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+    <div class="gw-table-wrapper">
+        <table class="gw-table">
+            <thead>
+                <tr>
+                    <th>Tytuł</th>
+                    <th>Opis</th>
+                    <th>Data premiery</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td class="gw-td-title">@item.Title</td>
+                        <td class="gw-td-desc">@item.Description</td>
+                        <td class="gw-td-date">@item.ReleaseDate.ToString("yyyy-MM-dd")</td>
+                        <td class="gw-td-actions">
+                            <a asp-action="Edit" asp-route-id="@item.Id" class="gw-action-link gw-action-edit">Edytuj</a>
+                            <span class="gw-action-sep">|</span>
+                            <a asp-action="Details" asp-route-id="@item.Id" class="gw-action-link gw-action-details">Szczegóły</a>
+                            <span class="gw-action-sep">|</span>
+                            <a asp-action="Delete" asp-route-id="@item.Id" class="gw-action-link gw-action-delete">Usuń</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

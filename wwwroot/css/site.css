@@ -669,4 +669,112 @@ body {
         color: white !important;
     }
 
-    
+
+.gw-table-wrapper {
+    background: rgba(30, 35, 50, 0.8);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.gw-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+    .gw-table thead tr {
+        background: rgba(124, 58, 237, 0.12);
+        border-bottom: 1px solid rgba(124, 58, 237, 0.25);
+    }
+
+    .gw-table thead th {
+        padding: 0.9rem 1.2rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #a78bfa;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+    }
+
+    .gw-table tbody tr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        transition: background 0.15s;
+    }
+
+        .gw-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .gw-table tbody tr:hover {
+            background: rgba(124, 58, 237, 0.07);
+        }
+
+    .gw-table td {
+        padding: 0.9rem 1.2rem;
+        vertical-align: middle;
+        font-size: 0.92rem;
+        color: #cbd5e1;
+    }
+
+.gw-td-title {
+    font-weight: 700;
+    color: #f1f5f9 !important;
+}
+
+.gw-td-desc {
+    color: #94a3b8 !important;
+    max-width: 340px;
+}
+
+.gw-td-date {
+    color: #64748b !important;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.gw-td-actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.gw-action-link {
+    font-size: 0.83rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+
+.gw-action-edit {
+    color: #a78bfa;
+}
+
+    .gw-action-edit:hover {
+        color: #7c3aed;
+    }
+
+.gw-action-details {
+    color: #60a5fa;
+}
+
+    .gw-action-details:hover {
+        color: #3b82f6;
+    }
+
+.gw-action-delete {
+    color: #f87171;
+}
+
+    .gw-action-delete:hover {
+        color: #ef4444;
+    }
+
+.gw-action-sep {
+    color: rgba(255,255,255,0.15);
+    margin: 0 0.35rem;
+    font-size: 0.8rem;
+}
+
+
+.gw-input-date {
+    color-scheme: dark;
+}

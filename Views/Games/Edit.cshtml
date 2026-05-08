@@ -1,26 +1,48 @@
 ﻿@model GameWiki.DTOs.Game.UpdateGameDto
+@{
+    ViewData["Title"] = "Edytuj grę";
+}
 
-<h1>Edit Game</h1>
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card" style="max-width: 560px;">
 
-<form asp-action="Edit">
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">✏️</div>
+            <h1 class="gw-auth-title">Edytuj grę</h1>
+            <p class="gw-auth-sub">Zaktualizuj informacje o grze</p>
+        </div>
 
-    <input type="hidden" asp-for="Id" />
+        <form asp-action="Edit">
+            <input type="hidden" asp-for="Id" />
 
-    <div>
-        <label asp-for="Title"></label>
-        <input asp-for="Title" class="form-control" />
+            <div class="gw-form-group">
+                <label asp-for="Title" class="gw-label"></label>
+                <input asp-for="Title" class="gw-input" placeholder="Tytuł gry" />
+                <span asp-validation-for="Title" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-group">
+                <label asp-for="Description" class="gw-label"></label>
+                <textarea asp-for="Description" class="gw-input" rows="4"
+                          placeholder="Opis gry..." style="resize:vertical;"></textarea>
+                <span asp-validation-for="Description" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-group">
+                <label asp-for="ReleaseDate" class="gw-label"></label>
+                <input asp-for="ReleaseDate" class="gw-input gw-input-date" type="date" />
+                <span asp-validation-for="ReleaseDate" class="gw-field-error"></span>
+            </div>
+
+            <div style="display:flex; gap:0.8rem; margin-top:1.8rem;">
+                <button type="submit" class="gw-btn-primary gw-btn-full">
+                    💾 Zapisz zmiany
+                </button>
+                <a asp-action="Index" class="gw-btn-outline gw-btn-full" style="text-align:center;">
+                    Anuluj
+                </a>
+            </div>
+        </form>
+
     </div>
-
-    <div>
-        <label asp-for="Description"></label>
-        <input asp-for="Description" class="form-control" />
-    </div>
-
-    <div>
-        <label asp-for="ReleaseDate"></label>
-        <input asp-for="ReleaseDate" class="form-control" type="date"/>
-    </div>
-
-    <button type="submit">Save</button>
-
-</form>
+</div>

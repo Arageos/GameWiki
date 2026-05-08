@@ -1,17 +1,43 @@
 ﻿@model GameWiki.DTOs.Game.GameDto
+@{
+    ViewData["Title"] = "Usuń grę";
+}
 
-<h1>Delete</h1>
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card" style="max-width: 500px;">
 
-<h3>Are you sure?</h3>
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">🗑️</div>
+            <h1 class="gw-auth-title">Usuń grę</h1>
+            <p class="gw-auth-sub">Ta operacja jest nieodwracalna</p>
+        </div>
 
-<div>
-    <p>@Model.Title</p>
-    <p>@Model.Description</p>
+        <div style="background: rgba(248,113,113,0.07); border: 1px solid rgba(248,113,113,0.2);
+                    border-radius: 14px; padding: 1.2rem 1.5rem; margin-bottom: 1.8rem;">
+            <p style="font-size:1.05rem; font-weight:700; color:#f1f5f9; margin:0 0 0.4rem;">
+                @Model.Title
+            </p>
+            <p style="font-size:0.9rem; color:#94a3b8; margin:0;">
+                @Model.Description
+            </p>
+        </div>
+
+        <form asp-action="Delete">
+            <input type="hidden" asp-for="Id" />
+            <div style="display:flex; gap:0.8rem;">
+                <button type="submit" class="gw-btn-full"
+                        style="background: linear-gradient(135deg,#dc2626,#b91c1c);
+                               color:white; border:none; border-radius:10px;
+                               font-weight:700; font-size:1rem; cursor:pointer;
+                               box-shadow: 0 4px 20px rgba(220,38,38,0.35);
+                               transition: all 0.2s;">
+                    🗑️ Tak, usuń
+                </button>
+                <a asp-action="Index" class="gw-btn-outline gw-btn-full" style="text-align:center;">
+                    Anuluj
+                </a>
+            </div>
+        </form>
+
+    </div>
 </div>
-
-<form asp-action="Delete">
-    <input type="hidden" asp-for="Id" />
-    <button type="submit">Delete</button>
-</form>
-
-<a asp-action="Index">Back</a>

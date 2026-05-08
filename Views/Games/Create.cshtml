@@ -1,24 +1,46 @@
 ﻿@model GameWiki.DTOs.Game.CreateGameDto
+@{
+    ViewData["Title"] = "Dodaj grę";
+}
 
-<h1>Create Game</h1>
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card" style="max-width: 560px;">
 
-<form asp-action="Create">
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">🎮</div>
+            <h1 class="gw-auth-title">Dodaj nową grę</h1>
+            <p class="gw-auth-sub">Uzupełnij informacje o grze</p>
+        </div>
 
-    <div>
-        <label asp-for="Title"></label>
-        <input asp-for="Title" class="form-control" />
+        <form asp-action="Create">
+            <div class="gw-form-group">
+                <label asp-for="Title" class="gw-label"></label>
+                <input asp-for="Title" class="gw-input" placeholder="np. Wiedźmin 3: Dziki Gon" />
+                <span asp-validation-for="Title" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-group">
+                <label asp-for="Description" class="gw-label"></label>
+                <textarea asp-for="Description" class="gw-input" rows="4"
+                          placeholder="Krótki opis gry..." style="resize:vertical;"></textarea>
+                <span asp-validation-for="Description" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-group">
+                <label asp-for="ReleaseDate" class="gw-label"></label>
+                <input asp-for="ReleaseDate" class="gw-input gw-input-date" type="date" />
+                <span asp-validation-for="ReleaseDate" class="gw-field-error"></span>
+            </div>
+
+            <div style="display:flex; gap:0.8rem; margin-top:1.8rem;">
+                <button type="submit" class="gw-btn-primary gw-btn-full">
+                    ✚ Dodaj grę
+                </button>
+                <a asp-action="Index" class="gw-btn-outline gw-btn-full" style="text-align:center;">
+                    Anuluj
+                </a>
+            </div>
+        </form>
+
     </div>
-
-    <div>
-        <label asp-for="Description"></label>
-        <input asp-for="Description" class="form-control" />
-    </div>
-
-    <div>
-        <label asp-for="ReleaseDate"></label>
-        <input asp-for="ReleaseDate" class="form-control" type="date"/>
-    </div>
-
-    <button type="submit">Create</button>
-
-</form>
+</div>
