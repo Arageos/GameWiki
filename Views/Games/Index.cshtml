@@ -4,44 +4,59 @@
 }
 
 <div class="gw-section">
-    <div class="gw-section-header" style="text-align:left; margin-bottom:1.5rem;">
-        <h1 class="gw-section-title">🎮 Games</h1>
-        <p class="gw-section-sub">Przeglądaj i zarządzaj bazą gier</p>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <div>
+            <h1 class="gw-section-title">🎮 Games</h1>
+            <p class="gw-section-sub">Przeglądaj bazę gier</p>
+        </div>
+        @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+        {
+            <a asp-action="Create" class="gw-btn-primary">+ Dodaj grę</a>
+        }
     </div>
 
-    <div style="margin-bottom:1.2rem;">
-        <a asp-action="Create" class="gw-btn-primary" style="font-size:0.9rem; padding:0.55rem 1.3rem;">
-            + Dodaj grę
-        </a>
-    </div>
-
-    <div class="gw-table-wrapper">
-        <table class="gw-table">
-            <thead>
-                <tr>
-                    <th>Tytuł</th>
-                    <th>Opis</th>
-                    <th>Data premiery</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var item in Model)
-                {
-                    <tr>
-                        <td class="gw-td-title">@item.Title</td>
-                        <td class="gw-td-desc">@item.Description</td>
-                        <td class="gw-td-date">@item.ReleaseDate.ToString("yyyy-MM-dd")</td>
-                        <td class="gw-td-actions">
-                            <a asp-action="Edit" asp-route-id="@item.Id" class="gw-action-link gw-action-edit">Edytuj</a>
+    <div class="gw-games-grid">
+        @foreach (var game in Model)
+        {
+            <div class="gw-game-card">
+                <a asp-action="Details" asp-route-id="@game.Id" class="gw-game-banner-link">
+                    @if (!string.IsNullOrEmpty(game.BackgroundImage))
+                    {
+                        <img src="@game.BackgroundImage" class="gw-game-banner" alt="@game.Title" />
+                    }
+                    else
+                    {
+                        <div class="gw-game-banner-placeholder">🎮</div>
+                    }
+            </a>
+            <div class="gw-game-info">
+                <a asp-action="Details" asp-route-id="@game.Id" class="gw-game-title">
+                    @game.Title
+                </a>
+                <span class="gw-game-date">@game.ReleaseDate.ToString("yyyy")</span>
+                <p class="gw-game-desc">
+                    @(game.Description.Length > 100
+                                        ? game.Description[..100] + "..."
+                                        : game.Description)
+                </p>
+                @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+                    {
+                        <div class="gw-game-actions">
+                            <a asp-action="Details" asp-route-id="@game.Id" class="gw-action-link gw-action-details">Szczegóły</a>
                             <span class="gw-action-sep">|</span>
-                            <a asp-action="Details" asp-route-id="@item.Id" class="gw-action-link gw-action-details">Szczegóły</a>
+                            <a asp-action="Edit" asp-route-id="@game.Id" class="gw-action-link gw-action-edit">Edytuj</a>
                             <span class="gw-action-sep">|</span>
-                            <a asp-action="Delete" asp-route-id="@item.Id" class="gw-action-link gw-action-delete">Usuń</a>
-                        </td>
-                    </tr>
+                            <a asp-action="Delete" asp-route-id="@game.Id" class="gw-action-link gw-action-delete">Usuń</a>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="gw-game-actions">
+                            <a asp-action="Details" asp-route-id="@game.Id" class="gw-action-link gw-action-details">Szczegóły</a>
+                        </div>
+                    }
+            </div>
+        </div>
                 }
-            </tbody>
-        </table>
     </div>
 </div>

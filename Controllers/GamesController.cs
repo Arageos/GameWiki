@@ -24,7 +24,8 @@ namespace GameWiki.Controllers
                     Id = g.Id,
                     Title = g.Title,
                     Description = g.Description,
-                    ReleaseDate = g.ReleaseDate
+                    ReleaseDate = g.ReleaseDate,
+                    BackgroundImage = g.BackgroundImage
                 })
                 .ToListAsync();
 
@@ -43,7 +44,8 @@ namespace GameWiki.Controllers
                     Id = g.Id,
                     Title = g.Title,
                     Description = g.Description,
-                    ReleaseDate = g.ReleaseDate
+                    ReleaseDate = g.ReleaseDate,
+                    BackgroundImage = g.BackgroundImage
                 })
                 .FirstOrDefaultAsync();
 

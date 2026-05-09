@@ -9,6 +9,9 @@ namespace GameWiki.Services
         public string Released { get; set; }
         public List<RawgGenre> Genres { get; set; }
         public List<RawgPlatformWrapper> Platforms { get; set; }
+
+        [JsonPropertyName("background_image")]
+        public string BackgroundImage { get; set; }
     }
 
     public class RawgGameDetails
@@ -19,6 +22,10 @@ namespace GameWiki.Services
 
         [JsonPropertyName("description_raw")]
         public string DescriptionRaw { get; set; }
+
+        [JsonPropertyName("background_image")]
+        public string BackgroundImage { get; set; }
+
         public List<RawgGenre> Genres { get; set; }
         public List<RawgPlatformWrapper> Platforms { get; set; }
     }

@@ -52,6 +52,7 @@ namespace GameWiki.Controllers
                 Title = details.Name,
                 Description = details.DescriptionRaw ?? "Brak opisu.",
                 ReleaseDate = releaseDate,
+                BackgroundImage = details.BackgroundImage,
                 GameGenres = new List<GameGenre>(),
                 GamePlatforms = new List<GamePlatform>()
             };

@@ -15,6 +15,8 @@ namespace GameWiki.Models
         public string Description { get; set; }
         public DateTime ReleaseDate { get; set; }
 
+        public string? BackgroundImage { get; set; }
+
         public ICollection<GameGenre> GameGenres { get; set; }
         public ICollection<GamePlatform> GamePlatforms { get; set; }
     }
