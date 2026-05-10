@@ -624,7 +624,7 @@ body {
 }
 
 .nav-badge-admin, .nav-badge-mod {
-    background: linear-gradient(135deg, #ff3333, #3366ff);
+    background: linear-gradient(135deg, red, blue);
     color: white;
     font-size: 0.75rem;
     font-weight: 800;
