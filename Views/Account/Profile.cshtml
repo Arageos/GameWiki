@@ -1,0 +1,46 @@
+﻿@model GameWiki.Models.User
+@{
+    ViewData["Title"] = "Mój Profil";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="gw-card p-4 shadow-lg" style="background: #1a1d26; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
+                <div class="text-center mb-4">
+                    <div class="gw-profile-avatar-large mx-auto">
+                        @Model.Username.Substring(0, 1).ToUpper()
+                    </div>
+                    <h2 class="mt-3 fw-bold text-white">@Model.Username</h2>
+
+                    @{
+                        string badgeClass = ViewBag.RoleName switch
+                        {
+                            "Admin" => "nav-badge-admin",
+                            "Moderator" => "nav-badge-mod",
+                            _ => "nav-badge-user"
+                        };
+                    }
+                    <span class="@badgeClass px-3 py-2 mt-2" style="font-size: 0.9rem;">
+                        @ViewBag.RoleName
+                    </span>
+                </div>
+
+                <div class="row mt-5 text-center">
+                    <div class="col-sm-6 mb-4">
+                        <label class="small text-uppercase fw-bold" style="color: #94a3b8; letter-spacing: 1px;">Adres Email</label>
+                        <p class="fs-5 text-white mt-1">@Model.Email</p>
+                    </div>
+                    <div class="col-sm-6 mb-4">
+                        <label class="small text-uppercase fw-bold" style="color: #94a3b8; letter-spacing: 1px;">Aktywność</label>
+                        <p class="fs-5 text-white mt-1">@(Model.Reviews?.Count ?? 0) napisanych recenzji</p>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-4 border-top border-secondary text-center">
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-outline-light px-4">Wróć do strony głównej</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
