@@ -2,6 +2,7 @@
 using GameWiki.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
@@ -165,6 +166,30 @@ namespace GameWiki.Controllers
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 new ClaimsPrincipal(claimsIdentity),
                 authProperties);
+        }
+        [Authorize]
+        public async Task<IActionResult> Profile()
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim == null) return NotFound();
+
+            int userId = int.Parse(userIdClaim.Value);
+
+            var user = await _context.Users
+                .Include(u => u.Reviews)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null) return NotFound();
+
+            var role = await _context.UserRoles
+                .Include(ur => ur.Role)
+                .Where(ur => ur.UserId == userId)
+                .Select(ur => ur.Role.Name)
+                .FirstOrDefaultAsync() ?? "Użytkownik";
+
+            ViewBag.RoleName = role;
+
+            return View(user);
         }
     }
 }

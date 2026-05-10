@@ -9,11 +9,11 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/GameWiki.styles.css" asp-append-version="true" />
 </head>
-<body style="min-height: 100vh; display: flex; flex-direction: column; margin: 0; background-color: #0f1117; color: #e2e8f0;">
+<body id="top" style="min-height: 100vh; display: flex; flex-direction: column; margin: 0; background-color: #0f1117; color: #e2e8f0;">
 
-    <nav class="navbar navbar-expand-sm navbar-toggleable-sm" style="flex-shrink: 0;">
+    <nav class="navbar navbar-expand-sm navbar-toggleable-sm sticky-top" style="flex-shrink: 0; background: rgba(15, 17, 23, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.05); z-index: 1030;">
         <div class="container">
-            <a class="navbar-brand" asp-controller="Home" asp-action="Index">GameWiki</a>
+            <a class="navbar-brand fw-bold text-white" asp-controller="Home" asp-action="Index">GameWiki</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                     data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                     aria-expanded="false" aria-label="Toggle navigation">
@@ -22,10 +22,7 @@
             <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                 <ul class="navbar-nav flex-grow-1">
                     <li class="nav-item">
-                        <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" asp-controller="Games" asp-action="Index">Gry</a>
+                        <a class="nav-link text-light" asp-controller="Games" asp-action="Index">Gry</a>
                     </li>
                     <li class="nav-item">
                         @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
@@ -34,33 +31,47 @@
                         }
                     </li>
                 </ul>
-                <ul class="navbar-nav">
+                <ul class="navbar-nav align-items-center">
                     @if (User.Identity?.IsAuthenticated == true)
                     {
-                        <li class="nav-item nav-username">
-                            👤 @User.Identity.Name
-                            @if (User.IsInRole("Moderator"))
-                            {
-                                <span class="nav-badge-mod">MOD</span>
-                            }
-                            else if (User.IsInRole("Admin"))
-                            {
-                                <span class="nav-badge-mod">ADMIN</span>
-                            }
-                        </li>
-                        <li class="nav-item">
-                            <form asp-controller="Account" asp-action="Logout" method="post" style="margin:0">
-                                <button type="submit" class="nav-link nav-logout-btn">Wyloguj</button>
-                            </form>
+                        <li class="nav-item dropdown gw-user-dropdown" style="z-index: 1050;">
+                            <button class="btn dropdown-toggle gw-profile-btn" type="button" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                <div class="gw-avatar-circle">
+                                    @User.Identity.Name.Substring(0, 1).ToUpper()
+                                </div>
+                                <span class="ms-2 d-none d-md-inline text-light">@User.Identity.Name</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end gw-dropdown-dark shadow-lg" aria-labelledby="profileDropdown">
+                                <li class="dropdown-header">
+                                    <div class="fw-bold text-white mb-2">@User.Identity.Name</div>
+                                    @if (User.IsInRole("Admin"))
+                                    {
+                                        <span class="nav-badge-admin">ADMIN</span>
+                                    }
+                                    else if (User.IsInRole("Moderator"))
+                                    {
+                                        <span class="nav-badge-mod">MOD</span>
+                                    }
+                                </li>
+                                <li><hr class="dropdown-divider border-secondary"></li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Account" asp-action="Profile">👤 Mój Profil</a>
+                                </li>
+                                <li>
+                                    <form asp-controller="Account" asp-action="Logout" method="post" class="m-0 p-0">
+                                        <button type="submit" class="dropdown-item text-danger">🚪 Wyloguj się</button>
+                                    </form>
+                                </li>
+                            </ul>
                         </li>
                     }
                     else
                     {
                         <li class="nav-item">
-                            <a class="nav-link" asp-controller="Account" asp-action="Login">Logowanie</a>
+                            <a class="nav-link text-light" asp-controller="Account" asp-action="Login">Zaloguj się</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-btn-register" asp-controller="Account" asp-action="Register">Rejestracja</a>
+                        <li class="nav-item ms-2">
+                            <a class="btn btn-primary rounded-pill px-3 py-1" asp-controller="Account" asp-action="Register">Rejestracja</a>
                         </li>
                     }
                 </ul>
@@ -73,7 +84,7 @@
             @RenderBody()
         </main>
     </div>
-
+    <a href="#top" id="gw-back-to-top" title="Wróć na górę">↑</a>
     <footer style="flex-shrink: 0; background: rgba(15, 17, 23, 0.95); border-top: 1px solid rgba(255,255,255,0.07); color: #475569; padding: 1.5rem 0;">
         <div class="container">
             &copy; 2026 - GameWiki
