@@ -12,10 +12,12 @@ namespace GameWiki.Controllers
     public class AccountController : Controller
     {
         private readonly GameWikiDbContext _context;
+        private readonly IWebHostEnvironment _env;
 
-        public AccountController(GameWikiDbContext context)
+        public AccountController(GameWikiDbContext context, IWebHostEnvironment env)
         {
             _context = context;
+            _env = env;
         }
 
         // GET: Account/Register
@@ -110,6 +112,12 @@ namespace GameWiki.Controllers
                 return View(dto);
             }
 
+            if (user.IsBanned)
+            {
+                ModelState.AddModelError(string.Empty, "Zostałeś zablokowany. Skontaktuj się z administracją.");
+                return View(dto);
+            }
+
             // Pobierz rolę użytkownika
             var userRole = await _context.UserRoles
                 .Include(ur => ur.Role)
@@ -148,7 +156,8 @@ namespace GameWiki.Controllers
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, role)
+                new Claim(ClaimTypes.Role, role),
+                new Claim("AvatarUrl", user.ProfilePictureUrl ?? "")
             };
 
             var claimsIdentity = new ClaimsIdentity(
@@ -177,9 +186,17 @@ namespace GameWiki.Controllers
 
             var user = await _context.Users
                 .Include(u => u.Reviews)
+                .Include(u => u.FavoriteLists)
+                    .ThenInclude(fl => fl.FavoriteGames)
+                    .ThenInclude(fg => fg.Game)
                 .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (user == null) return NotFound();
+
+            ViewBag.AllGames = await _context.Games
+                .OrderBy(g => g.Title)
+                .Select(g => new { g.Id, g.Title })
+                .ToListAsync();
 
             var role = await _context.UserRoles
                 .Include(ur => ur.Role)
@@ -190,6 +207,137 @@ namespace GameWiki.Controllers
             ViewBag.RoleName = role;
 
             return View(user);
+        }
+        [Authorize]
+        public async Task<IActionResult> Settings()
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var user = await _context.Users.FindAsync(userId);
+
+            if (user == null) return NotFound();
+
+            var dto = new UpdateProfileDto
+            {
+                Username = user.Username,
+                Email = user.Email,
+                Description = user.Description
+            };
+
+            ViewBag.ProfilePictureUrl = user.ProfilePictureUrl;
+            return View(dto);
+        }
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateProfile(UpdateProfileDto dto)
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var user = await _context.Users.FindAsync(userId);
+
+            if (user == null) return NotFound();
+
+            if (!ModelState.IsValid)
+            {
+                ViewBag.ProfilePictureUrl = user.ProfilePictureUrl;
+                return View("Settings", dto);
+            }
+
+            // Sprawdzanie unikalności emaila/loginu jeśli zostały zmienione
+            if (dto.Email != user.Email && await _context.Users.AnyAsync(u => u.Email == dto.Email))
+            {
+                ModelState.AddModelError("Email", "Ten email jest już zajęty");
+                return View("Settings", dto);
+            }
+
+            if (dto.Username != user.Username && await _context.Users.AnyAsync(u => u.Username == dto.Username))
+            {
+                ModelState.AddModelError("Username", "Ta nazwa użytkownika jest już zajęta");
+                return View("Settings", dto);
+            }
+
+            user.Username = dto.Username;
+            user.Email = dto.Email;
+            user.Description = dto.Description;
+
+            await _context.SaveChangesAsync();
+
+            // Konieczność przelogowania, aby odświeżyć Claimsy z nową nazwą/emailem
+            var role = await _context.UserRoles.Include(ur => ur.Role).Where(ur => ur.UserId == user.Id).Select(ur => ur.Role.Name).FirstOrDefaultAsync() ?? "User";
+            await SignInUser(user, role, true); // Odświeżenie ciasteczka
+
+            TempData["SuccessMessage"] = "Profil został zaktualizowany.";
+            return RedirectToAction(nameof(Settings));
+        }
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ChangePassword(ChangePasswordDto dto)
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var user = await _context.Users.FindAsync(userId);
+
+            if (!ModelState.IsValid) return View("Settings", new UpdateProfileDto { Username = user!.Username, Email = user.Email, Description = user.Description });
+
+            if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user!.PasswordHash))
+            {
+                TempData["ErrorMessage"] = "Obecne hasło jest nieprawidłowe.";
+                return RedirectToAction(nameof(Settings));
+            }
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "Hasło zostało pomyślnie zmienione.";
+            return RedirectToAction(nameof(Settings));
+        }
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UploadAvatar(IFormFile avatarFile)
+        {
+            if (avatarFile != null && avatarFile.Length > 0)
+            {
+                // Sprawdzenie rozszerzenia (tylko png/jpg)
+                var ext = Path.GetExtension(avatarFile.FileName).ToLower();
+                if (ext != ".png" && ext != ".jpg" && ext != ".jpeg")
+                {
+                    TempData["ErrorMessage"] = "Dozwolone są tylko pliki .png, .jpg i .jpeg";
+                    return RedirectToAction(nameof(Settings));
+                }
+
+                // Generowanie unikalnej nazwy i ścieżki
+                var uploadsFolder = Path.Combine(_env.WebRootPath, "images", "avatars");
+                Directory.CreateDirectory(uploadsFolder); // Tworzy folder, jeśli nie istnieje
+
+                var uniqueFileName = Guid.NewGuid().ToString() + "_" + avatarFile.FileName;
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await avatarFile.CopyToAsync(fileStream);
+                }
+
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+                var user = await _context.Users.FindAsync(userId);
+
+                user!.ProfilePictureUrl = $"/images/avatars/{uniqueFileName}";
+                await _context.SaveChangesAsync();
+                var role = await _context.UserRoles
+                .Include(ur => ur.Role)
+                .Where(ur => ur.UserId == user.Id)
+                .Select(ur => ur.Role.Name)
+                .FirstOrDefaultAsync() ?? "User";
+
+                // Ponowne wywołanie SignInUser odświeży dane w ciasteczku (w tym nasz nowy AvatarUrl)
+                await SignInUser(user, role, true);
+
+                TempData["SuccessMessage"] = "Awatar został zaktualizowany.";
+                return RedirectToAction(nameof(Settings));
+            }
+            return RedirectToAction(nameof(Settings));
         }
     }
 }

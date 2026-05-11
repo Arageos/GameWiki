@@ -136,15 +136,18 @@
 <!-- SEKCJA: CTA -->
 <section class="gw-cta-section">
     <div class="gw-cta-content">
-        <h2 class="gw-cta-title">Gotowy, żeby zacząć?</h2>
-        <p class="gw-cta-sub">Dołącz do społeczności graczy. Rejestracja jest bezpłatna.</p>
-        <div class="gw-cta-actions">
-            <a asp-controller="Account" asp-action="Register" class="gw-btn-primary">
-                Zarejestruj się za darmo
-            </a>
-            <a asp-controller="Account" asp-action="Login" class="gw-btn-ghost">
-                Zaloguj się
-            </a>
-        </div>
+        @if (!User.Identity.IsAuthenticated)
+        {
+            <h2 class="gw-cta-title">Gotowy, żeby zacząć?</h2>
+            <p class="gw-cta-sub">Dołącz do społeczności graczy. Rejestracja jest bezpłatna.</p>
+            <div class="gw-cta-actions">
+                <a asp-controller="Account" asp-action="Register" class="gw-btn-primary">
+                    Zarejestruj się za darmo
+                </a>
+                <a asp-controller="Account" asp-action="Login" class="gw-btn-ghost">
+                    Zaloguj się
+                </a>
+            </div>
+        }
     </div>
 </section>

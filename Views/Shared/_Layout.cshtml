@@ -24,21 +24,27 @@
                     <li class="nav-item">
                         <a class="nav-link text-light" asp-controller="Games" asp-action="Index">Gry</a>
                     </li>
-                    <li class="nav-item">
-                        @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
-                        {
-                            <a asp-controller="GamesImport" asp-action="Index" class="nav-link">📥 Import RAWG</a>
-                        }
-                    </li>
                 </ul>
                 <ul class="navbar-nav align-items-center">
                     @if (User.Identity?.IsAuthenticated == true)
                     {
                         <li class="nav-item dropdown gw-user-dropdown" style="z-index: 1050;">
                             <button class="btn dropdown-toggle gw-profile-btn" type="button" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                                <div class="gw-avatar-circle">
-                                    @User.Identity.Name.Substring(0, 1).ToUpper()
-                                </div>
+                                @{
+                                    // Po prostu wyciągamy ścieżkę z Claimów
+                                    var avatarUrl = User.FindFirst("AvatarUrl")?.Value;
+                                }
+
+                                @if (!string.IsNullOrEmpty(avatarUrl))
+                                {
+                                    <img src="@avatarUrl" alt="Avatar" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover; border: 2px solid #6366f1;" />
+                                }
+                                else
+                                {
+                                    <div class="gw-avatar-circle">
+                                        @User.Identity.Name.Substring(0, 1).ToUpper()
+                                    </div>
+                                }
                                 <span class="ms-2 d-none d-md-inline text-light">@User.Identity.Name</span>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end gw-dropdown-dark shadow-lg" aria-labelledby="profileDropdown">
@@ -56,7 +62,18 @@
                                 <li><hr class="dropdown-divider border-secondary"></li>
                                 <li>
                                     <a class="dropdown-item" asp-controller="Account" asp-action="Profile">👤 Mój Profil</a>
+                                    <a class="dropdown-item" asp-controller="Account" asp-action="Settings">⚙️ Ustawienia</a>
                                 </li>
+                                @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+                                {
+                                    <li>
+                                        <a class="dropdown-item text-warning" asp-controller="Admin" asp-action="Index">🛡️ Panel Zarządzania</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="dropdown-item text-info"  asp-controller="GamesImport" asp-action="Index" class="nav-link">📥 Import RAWG</a>
+                                    </li>
+                                    <li><hr class="dropdown-divider border-secondary"></li>
+                                }
                                 <li>
                                     <form asp-controller="Account" asp-action="Logout" method="post" class="m-0 p-0">
                                         <button type="submit" class="dropdown-item text-danger">🚪 Wyloguj się</button>

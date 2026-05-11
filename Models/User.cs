@@ -17,6 +17,13 @@ namespace GameWiki.Models
         [Required]
         public string PasswordHash { get; set; }
 
+        [MaxLength(500)]
+        public string? Description { get; set; }
+
+        public string? ProfilePictureUrl { get; set; }
+
         public ICollection<Review> Reviews { get; set; }
+        public ICollection<FavoriteList> FavoriteLists { get; set; }
+        public bool IsBanned { get; set; } = false;
     }
 }

@@ -1,0 +1,94 @@
+﻿@model GameWiki.DTOs.Auth.UpdateProfileDto
+@{
+    ViewData["Title"] = "Ustawienia Konta";
+}
+
+<div class="container py-5">
+    <div class="row">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success mb-4">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger mb-4">@TempData["ErrorMessage"]</div>
+        }
+
+        <div class="col-md-4 mb-4">
+            <div class="gw-card p-4 mb-4" style="background: #1a1d26; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
+                <h4 class="text-white mb-4">Zdjęcie profilowe</h4>
+                <div class="text-center mb-3">
+                    @if (!string.IsNullOrEmpty(ViewBag.ProfilePictureUrl))
+                    {
+                        <img src="@ViewBag.ProfilePictureUrl" alt="Avatar" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover; border: 3px solid #6366f1;" />
+                    }
+                    else
+                    {
+                        <div class="gw-profile-avatar-large mx-auto">
+                            @Model.Username.Substring(0, 1).ToUpper()
+                        </div>
+                    }
+                </div>
+                <form asp-action="UploadAvatar" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <input type="file" name="avatarFile" class="form-control bg-dark text-light" accept=".jpg,.jpeg,.png" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 rounded-pill">Wgraj zdjęcie</button>
+                </form>
+            </div>
+
+            <div class="gw-card p-4" style="background: #1a1d26; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
+                <h4 class="text-white mb-4">Zmiana hasła</h4>
+                <form asp-action="ChangePassword" method="post">
+                    <div class="mb-3">
+                        <input type="password" name="CurrentPassword" class="form-control gw-input" placeholder="Obecne hasło" required />
+                    </div>
+                    <div class="mb-3">
+                        <input type="password" name="NewPassword" class="form-control gw-input" placeholder="Nowe hasło (min. 8 znaków, m.in. znak specjalny)" required />
+                    </div>
+                    <div class="mb-3">
+                        <input type="password" name="ConfirmNewPassword" class="form-control gw-input" placeholder="Potwierdź nowe hasło" required />
+                    </div>
+                    <button type="submit" class="btn btn-danger w-100 rounded-pill">Zmień hasło</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="gw-card p-4" style="background: #1a1d26; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
+                <h4 class="text-white mb-4">Informacje podstawowe</h4>
+                <form asp-action="UpdateProfile" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <div class="mb-4">
+                        <label asp-for="Username" class="gw-label"></label>
+                        <input asp-for="Username" class="form-control gw-input" />
+                        <span asp-validation-for="Username" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="Email" class="gw-label"></label>
+                        <input asp-for="Email" class="form-control gw-input" />
+                        <span asp-validation-for="Email" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="Description" class="gw-label"></label>
+                        <textarea asp-for="Description" class="form-control gw-input" rows="4" placeholder="Napisz coś o sobie i swoich ulubionych grach..."></textarea>
+                        <span asp-validation-for="Description" class="text-danger small"></span>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-success px-5 rounded-pill">Zapisz zmiany</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

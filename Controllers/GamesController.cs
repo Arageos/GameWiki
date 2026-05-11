@@ -50,7 +50,16 @@ namespace GameWiki.Controllers
                 .FirstOrDefaultAsync();
 
             if (game == null) return NotFound();
-
+            if (User.Identity?.IsAuthenticated == true)
+            {
+                var userIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (int.TryParse(userIdStr, out int userId))
+                {
+                    ViewBag.UserLists = await _context.FavoriteLists
+                        .Where(l => l.UserId == userId)
+                        .ToListAsync();
+                }
+            }
             return View(game);
         }
 
