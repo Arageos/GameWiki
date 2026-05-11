@@ -1,0 +1,154 @@
+﻿@model GameWiki.DTOs.Article.CreateArticleDto
+@using GameWiki.Models
+@{
+    ViewData["Title"] = "Nowy artykuł";
+    var games = ViewBag.Games as List<Game> ?? new List<Game>();
+}
+
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card" style="max-width:720px;">
+
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">✍️</div>
+            <h1 class="gw-auth-title">Napisz artykuł</h1>
+            <p class="gw-auth-sub">Uzupełnij informacje i dodaj treść</p>
+        </div>
+
+        @if (!User.IsInRole("Admin") && !User.IsInRole("Moderator"))
+        {
+            <div class="alert alert-info" style="background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); color:#a5b4fc; border-radius:10px; padding:0.8rem 1rem; margin-bottom:1.5rem; font-size:0.88rem;">
+                ℹ️ Twój artykuł trafi do moderacji i zostanie opublikowany po zatwierdzeniu.
+            </div>
+        }
+
+        <form asp-action="Create" method="post" enctype="multipart/form-data" id="articleForm">
+            @Html.AntiForgeryToken()
+
+            @* Gra *@
+            <div class="gw-form-group">
+                <label class="gw-label">Gra</label>
+                <select name="GameId" class="gw-input" required>
+                    <option value="">— wybierz grę —</option>
+                    @foreach (var g in games)
+                    {
+                        <option value="@g.Id" selected="@(Model.GameId == g.Id)">@g.Title</option>
+                    }
+                </select>
+            </div>
+
+            @* Tytuł *@
+            <div class="gw-form-group">
+                <label asp-for="Title" class="gw-label"></label>
+                <input asp-for="Title" class="gw-input" placeholder="Tytuł artykułu" />
+                <span asp-validation-for="Title" class="gw-field-error"></span>
+            </div>
+
+            @* Zdjęcie tytułowe *@
+            <div class="gw-form-group">
+                <label class="gw-label">Zdjęcie tytułowe <span style="color:#64748b; font-weight:400;">(opcjonalne)</span></label>
+                <input type="file" name="CoverImage" accept="image/*" class="gw-input"
+                       style="padding:0.45rem 0.75rem;" id="coverInput" />
+                <div id="coverPreview" style="display:none; margin-top:0.6rem;">
+                    <img id="coverPreviewImg" src="" alt="Podgląd"
+                         style="max-height:160px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);" />
+                </div>
+            </div>
+
+            @* Bloki treści *@
+            <div class="gw-form-group">
+                <label class="gw-label">Treść artykułu</label>
+                <p style="font-size:0.82rem; color:#64748b; margin-bottom:0.8rem;">
+                    Dodawaj bloki tekstu i zdjęć w dowolnej kolejności.
+                </p>
+
+                <div id="blocksContainer" style="display:flex; flex-direction:column; gap:0.8rem;">
+                </div>
+
+                <div style="display:flex; gap:0.6rem; margin-top:0.8rem;">
+                    <button type="button" onclick="addTextBlock()" class="gw-btn-outline" style="font-size:0.85rem;">
+                        + Blok tekstu
+                    </button>
+                    <button type="button" onclick="addImageBlock()" class="gw-btn-outline" style="font-size:0.85rem;">
+                        + Zdjęcie
+                    </button>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:0.8rem; margin-top:1.8rem;">
+                <button type="submit" class="gw-btn-primary gw-btn-full">✚ Opublikuj artykuł</button>
+                <a asp-action="Index" class="gw-btn-outline gw-btn-full" style="text-align:center;">Anuluj</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let blockIndex = 0;
+
+    function addTextBlock() {
+        const i = blockIndex++;
+        const container = document.getElementById('blocksContainer');
+        const div = document.createElement('div');
+        div.className = 'gw-block-item';
+        div.style.cssText = 'background:rgba(15,17,23,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:1rem;position:relative;';
+        div.innerHTML = `
+            <input type="hidden" name="Blocks[${i}].Type" value="0" />
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                <span style="font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">📝 Tekst</span>
+                <button type="button" onclick="removeBlock(this)" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+            </div>
+            <textarea name="Blocks[${i}].TextContent" class="gw-input" rows="5"
+                      placeholder="Treść bloku..." style="resize:vertical;margin:0;"></textarea>
+        `;
+        container.appendChild(div);
+    }
+
+    function addImageBlock() {
+        const i = blockIndex++;
+        const container = document.getElementById('blocksContainer');
+        const div = document.createElement('div');
+        div.className = 'gw-block-item';
+        div.style.cssText = 'background:rgba(15,17,23,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:1rem;position:relative;';
+        div.innerHTML = `
+            <input type="hidden" name="Blocks[${i}].Type" value="1" />
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                <span style="font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">🖼️ Zdjęcie</span>
+                <button type="button" onclick="removeBlock(this)" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+            </div>
+            <input type="file" name="Blocks[${i}].ImageFile" accept="image/*" class="gw-input"
+                   style="padding:0.45rem 0.75rem;" onchange="previewBlockImage(this)" />
+            <div class="block-preview" style="display:none;margin-top:0.5rem;">
+                <img src="" alt="Podgląd" style="max-height:140px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);" />
+            </div>
+        `;
+        container.appendChild(div);
+    }
+
+    function removeBlock(btn) {
+        btn.closest('.gw-block-item').remove();
+    }
+
+    function previewBlockImage(input) {
+        const preview = input.parentElement.querySelector('.block-preview');
+        const img = preview.querySelector('img');
+        if (input.files && input.files[0]) {
+            img.src = URL.createObjectURL(input.files[0]);
+            preview.style.display = 'block';
+        }
+    }
+
+    // Podgląd zdjęcia tytułowego
+    document.getElementById('coverInput').addEventListener('change', function () {
+        const preview = document.getElementById('coverPreview');
+        const img = document.getElementById('coverPreviewImg');
+        if (this.files && this.files[0]) {
+            img.src = URL.createObjectURL(this.files[0]);
+            preview.style.display = 'block';
+        }
+    });
+
+    // Zacznij od jednego pustego bloku tekstowego
+    addTextBlock();
+</script>
+}

@@ -1,0 +1,150 @@
+﻿@model GameWiki.Models.Comment
+@using GameWiki.Models
+@{
+    var allComments = (List<Comment>)ViewData["AllComments"];
+    var myReactions = (List<CommentReaction>)ViewData["MyReactions"];
+    var currentUserId = (int)ViewData["CurrentUserId"];
+    var articleId = (int)ViewData["ArticleId"];
+    var depth = (int)ViewData["Depth"];
+
+    var replies = allComments.Where(c => c.ParentCommentId == Model.Id).OrderBy(c => c.CreatedAt).ToList();
+
+    int likes = Model.Reactions?.Count(r => r.Type == ReactionType.Like) ?? 0;
+    int dislikes = Model.Reactions?.Count(r => r.Type == ReactionType.Dislike) ?? 0;
+    var myReaction = myReactions.FirstOrDefault(r => r.CommentId == Model.Id);
+
+    bool canDelete = currentUserId != 0 &&
+                     (Model.UserId == currentUserId || User.IsInRole("Admin") || User.IsInRole("Moderator"));
+    string replyFormId = $"reply-form-{Model.Id}";
+}
+
+<div style="margin-left:@(depth * 20)px; margin-bottom:0.8rem;">
+    <div style="background:rgba(15,17,23,0.55); border:1px solid rgba(255,255,255,@(depth == 0 ? "0.07" : "0.04"));
+                border-radius:10px; padding:0.9rem 1rem;">
+
+        @* Autor + data *@
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.4rem;">
+            <div style="display:flex; align-items:center; gap:0.6rem;">
+                <div style="width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                            display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; color:#fff; flex-shrink:0;">
+                    @Model.User?.Username.Substring(0, 1).ToUpper()
+                </div>
+                <span style="font-weight:600; color:#e2e8f0; font-size:0.9rem;">@Model.User?.Username</span>
+                <span style="color:#475569; font-size:0.78rem;">@Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")</span>
+            </div>
+
+            @* Usuń *@
+            @if (canDelete)
+            {
+                <form asp-controller="Article" asp-action="DeleteComment" method="post" style="margin:0;"
+                      onsubmit="return confirm('Usunąć komentarz?');">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="commentId" value="@Model.Id" />
+                    <input type="hidden" name="articleId" value="@articleId" />
+                    <button type="submit" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.78rem;padding:0;transition:color 0.2s;"
+                            onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#64748b'">
+                        🗑️ Usuń
+                    </button>
+                </form>
+            }
+        </div>
+
+        @* Treść *@
+        <p style="color:#cbd5e1; font-size:0.92rem; line-height:1.6; margin:0 0 0.7rem 0;">@Model.Content</p>
+
+        @* Akcje: Like / Dislike / Odpowiedz *@
+        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                @* Like *@
+                <form asp-controller="Article" asp-action="React" method="post" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="commentId" value="@Model.Id" />
+                    <input type="hidden" name="articleId" value="@articleId" />
+                    <input type="hidden" name="type" value="0" />
+                    <button type="submit"
+                            style="background:@(myReaction?.Type == ReactionType.Like ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.04)");
+                                       border:1px solid @(myReaction?.Type == ReactionType.Like ? "rgba(34,197,94,0.4)" : "rgba(255,255,255,0.08)");
+                                       color:@(myReaction?.Type == ReactionType.Like ? "#4ade80" : "#94a3b8");
+                                       border-radius:6px; padding:0.2rem 0.6rem; cursor:pointer; font-size:0.82rem;
+                                       display:flex; align-items:center; gap:0.3rem; transition:all 0.2s;">
+                        👍 @likes
+                    </button>
+                </form>
+
+                @* Dislike *@
+                <form asp-controller="Article" asp-action="React" method="post" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="commentId" value="@Model.Id" />
+                    <input type="hidden" name="articleId" value="@articleId" />
+                    <input type="hidden" name="type" value="1" />
+                    <button type="submit"
+                            style="background:@(myReaction?.Type == ReactionType.Dislike ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.04)");
+                                       border:1px solid @(myReaction?.Type == ReactionType.Dislike ? "rgba(239,68,68,0.4)" : "rgba(255,255,255,0.08)");
+                                       color:@(myReaction?.Type == ReactionType.Dislike ? "#f87171" : "#94a3b8");
+                                       border-radius:6px; padding:0.2rem 0.6rem; cursor:pointer; font-size:0.82rem;
+                                       display:flex; align-items:center; gap:0.3rem; transition:all 0.2s;">
+                        👎 @dislikes
+                    </button>
+                </form>
+
+                @* Odpowiedz — tylko do głębokości 1 (nie zagnieżdżaj w nieskończoność) *@
+                @if (depth < 1)
+                {
+                    <button type="button"
+                            onclick="document.getElementById('@replyFormId').style.display = document.getElementById('@replyFormId').style.display === 'none' ? 'block' : 'none'"
+                            style="background:none; border:none; color:#64748b; cursor:pointer; font-size:0.82rem; padding:0.2rem 0.4rem;">
+                        💬 Odpowiedz
+                    </button>
+                }
+            }
+            else
+            {
+                @* Niezalogowany — tylko liczniki *@
+                <span style="color:#64748b; font-size:0.82rem;">👍 @likes</span>
+                <span style="color:#64748b; font-size:0.82rem;">👎 @dislikes</span>
+            }
+        </div>
+
+        @* Formularz odpowiedzi (ukryty domyślnie) *@
+        @if (User.Identity?.IsAuthenticated == true && depth < 1)
+        {
+            <div id="@replyFormId" style="display:none; margin-top:0.8rem;">
+                <form asp-controller="Article" asp-action="AddComment" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="articleId" value="@articleId" />
+                    <input type="hidden" name="parentCommentId" value="@Model.Id" />
+                    <textarea name="content" class="gw-input" rows="2"
+                          placeholder="Twoja odpowiedź..."
+                          style="resize:vertical; margin-bottom:0.5rem; font-size:0.88rem;"></textarea>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button type="submit" class="gw-btn-primary" style="font-size:0.82rem; padding:0.35rem 1rem;">Wyślij</button>
+                        <button type="button"
+                                onclick="document.getElementById('@replyFormId').style.display='none'"
+                                class="gw-btn-outline" style="font-size:0.82rem; padding:0.35rem 1rem;">
+                            Anuluj
+                        </button>
+                    </div>
+                </form>
+            </div>
+        }
+    </div>
+
+    @* Zagnieżdżone odpowiedzi *@
+    @if (replies.Any())
+    {
+        <div style="margin-top:0.5rem;">
+            @foreach (var reply in replies)
+            {
+                var replyViewData = new ViewDataDictionary(ViewData);
+                replyViewData["AllComments"] = allComments;
+                replyViewData["MyReactions"] = myReactions;
+                replyViewData["CurrentUserId"] = currentUserId;
+                replyViewData["ArticleId"] = articleId;
+                replyViewData["Depth"] = depth + 1;
+                @await Html.PartialAsync("_Comment", reply, replyViewData)
+            }
+        </div>
+    }
+</div>

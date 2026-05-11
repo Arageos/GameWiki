@@ -1,0 +1,146 @@
+﻿@model IEnumerable<GameWiki.Models.Article>
+@using GameWiki.Models
+@{
+    ViewData["Title"] = "Artykuły";
+    var games = ViewBag.Games as List<Game> ?? new List<Game>();
+    var selectedGameId = (int?)ViewBag.SelectedGameId;
+    var selectedGame = selectedGameId.HasValue ? games.FirstOrDefault(g => g.Id == selectedGameId.Value) : null;
+}
+
+<div class="gw-section">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+        <div>
+            <h1 class="gw-section-title">📄 Artykuły</h1>
+            <p class="gw-section-sub">
+                @if (selectedGame != null)
+                {
+                    <span>
+                        Filtrowanie: <strong style="color:#a78bfa;">@selectedGame.Title</strong>
+                        &nbsp;·&nbsp; <a asp-action="Index" class="gw-action-link" style="font-size:0.85rem;">Pokaż wszystkie</a>
+                    </span>
+                }
+                else
+                {
+                    <span>Przeglądaj wiki i poradniki</span>
+                }
+            </p>
+        </div>
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <a asp-action="Create" class="gw-btn-primary">+ Napisz artykuł</a>
+        }
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-4">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @* ── FILTR PO GRZE ── *@
+    <div style="margin-bottom:1.5rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+        <span style="color:#64748b; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.05em;">Filtruj:</span>
+        <a asp-action="Index"
+           style="padding:0.3rem 0.85rem; border-radius:999px; font-size:0.82rem; font-weight:600; text-decoration:none;
+                  @(selectedGameId == null ? "background:#6366f1; color:#fff;" : "background:rgba(255,255,255,0.06); color:#94a3b8; border:1px solid rgba(255,255,255,0.1);")">
+            Wszystkie
+        </a>
+        @foreach (var game in games)
+        {
+            <a asp-action="Index" asp-route-gameId="@game.Id"
+               style="padding:0.3rem 0.85rem; border-radius:999px; font-size:0.82rem; font-weight:600; text-decoration:none;
+                          @(selectedGameId == game.Id ? "background:#6366f1; color:#fff;" : "background:rgba(255,255,255,0.06); color:#94a3b8; border:1px solid rgba(255,255,255,0.1);")">
+                @game.Title
+            </a>
+        }
+    </div>
+
+    @* ── LISTA ARTYKUŁÓW ── *@
+    @if (!Model.Any())
+    {
+        <div class="gw-auth-card" style="text-align:center; padding:3rem;">
+            <div style="font-size:3rem; margin-bottom:1rem;">📭</div>
+            <p style="color:#94a3b8;">
+                @if (selectedGame != null)
+                {
+                    <span>Brak artykułów dla gry <strong>@selectedGame.Title</strong>.</span>
+                }
+                else
+                {
+                    <span>Nie ma jeszcze żadnych artykułów.</span>
+                }
+            </p>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a asp-action="Create" asp-route-gameId="@selectedGameId" class="gw-btn-primary" style="margin-top:1rem;">
+                    + Napisz artykuł
+                </a>
+            }
+        </div>
+    }
+    else
+    {
+        <div style="display:flex; flex-direction:column; gap:1rem;">
+            @foreach (var article in Model)
+            {
+                <div class="gw-card" style="display:flex; gap:1.2rem; padding:1.2rem; align-items:flex-start;">
+                    @* Miniatura *@
+                    <a asp-action="Details" asp-route-id="@article.Id" style="flex-shrink:0;">
+                        @if (!string.IsNullOrEmpty(article.CoverImageUrl))
+                        {
+                            <img src="@article.CoverImageUrl" alt="Cover"
+                                 style="width:130px; height:80px; object-fit:cover; border-radius:8px; border:1px solid rgba(255,255,255,0.08);" />
+                        }
+                        else
+                        {
+                            <div style="width:130px; height:80px; border-radius:8px;
+                                                    background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.2);
+                                                    display:flex; align-items:center; justify-content:center; font-size:2rem;">
+                                📄
+                            </div>
+                        }
+                    </a>
+
+                    @* Treść *@
+                    <div style="flex:1; min-width:0;">
+                        <a asp-action="Details" asp-route-id="@article.Id"
+                           style="font-size:1.05rem; font-weight:700; color:#e2e8f0; text-decoration:none; display:block; margin-bottom:0.35rem;">
+                            @article.Title
+                            @if (!article.IsVerified)
+                            {
+                                <span class="badge bg-warning text-dark ms-2" style="font-size:0.68rem; vertical-align:middle;">Niezweryfikowany</span>
+                            }
+                        </a>
+                        <div style="display:flex; gap:1rem; font-size:0.8rem; color:#64748b; flex-wrap:wrap;">
+                            <span>
+                                🎮 <a asp-action="Index" asp-route-gameId="@article.GameId"
+                                      style="color:#a78bfa; text-decoration:none;">@article.Game?.Title</a>
+                            </span>
+                            <span>✍️ @article.Author?.Username</span>
+                            <span>🕐 @article.CreatedAt.ToString("dd.MM.yyyy")</span>
+                        </div>
+                    </div>
+
+                    @* Akcje mod *@
+                    @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+                    {
+                        <div style="display:flex; gap:0.5rem; flex-shrink:0; align-items:center;">
+                            <a asp-action="Edit" asp-route-id="@article.Id"
+                               class="gw-action-link gw-action-edit" style="font-size:0.82rem;">Edytuj</a>
+                            <form asp-action="Delete" asp-route-id="@article.Id" method="post" style="margin:0;"
+                                  onsubmit="return confirm('Usunąć artykuł?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="gw-action-link gw-action-delete"
+                                        style="background:none;border:none;cursor:pointer;font-size:0.82rem;padding:0;">
+                                    Usuń
+                                </button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>

@@ -117,5 +117,17 @@ namespace GameWiki.Controllers
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
+        [Authorize(Roles = "Admin,Moderator")]
+        public async Task<IActionResult> PendingArticles()
+        {
+            var articles = await _context.Articles
+                .Where(a => !a.IsVerified)
+                .Include(a => a.Author)
+                .Include(a => a.Game)
+                .OrderBy(a => a.CreatedAt)
+                .ToListAsync();
+
+            return View(articles);
+        }
     }
 }

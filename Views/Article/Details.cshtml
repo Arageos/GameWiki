@@ -1,0 +1,133 @@
+﻿@model GameWiki.Models.Article
+@using GameWiki.Models
+@{
+    ViewData["Title"] = Model.Title;
+    var allComments = (List<Comment>)ViewBag.AllComments;
+    var myReactions = (List<CommentReaction>)ViewBag.MyReactions;
+    var currentUserId = int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out int uid) ? uid : 0;
+
+    IEnumerable<Comment> RootComments() => allComments.Where(c => c.ParentCommentId == null);
+    IEnumerable<Comment> Replies(int parentId) => allComments.Where(c => c.ParentCommentId == parentId).OrderBy(c => c.CreatedAt);
+}
+
+<div class="gw-section">
+
+    @* ── NAGŁÓWEK ── *@
+    @if (!string.IsNullOrEmpty(Model.CoverImageUrl))
+    {
+        <div class="gw-details-banner" style="background-image:url('@Model.CoverImageUrl');">
+            <div class="gw-details-banner-overlay">
+                <h1 class="gw-details-title">@Model.Title</h1>
+                <span class="gw-details-date">
+                    @Model.Game?.Title &nbsp;·&nbsp; ✍️ @Model.Author?.Username
+                    &nbsp;·&nbsp; @Model.CreatedAt.ToString("dd.MM.yyyy")
+                    @if (!Model.IsVerified)
+                    {
+                        <span class="badge bg-warning text-dark ms-2" style="font-size:0.7rem;">Oczekuje na weryfikację</span>
+                    }
+                </span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">📄</div>
+            <h1 class="gw-auth-title">@Model.Title</h1>
+            <p class="gw-auth-sub">
+                @Model.Game?.Title &nbsp;·&nbsp; ✍️ @Model.Author?.Username
+                &nbsp;·&nbsp; @Model.CreatedAt.ToString("dd.MM.yyyy")
+                @if (!Model.IsVerified)
+                {
+                    <span class="badge bg-warning text-dark ms-2">Oczekuje na weryfikację</span>
+                }
+            </p>
+        </div>
+    }
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-3">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @* ── TREŚĆ ARTYKUŁU ── *@
+    <div style="max-width:780px; margin:2rem auto 0;">
+        @foreach (var block in Model.Blocks)
+        {
+            if (block.Type == ArticleBlockType.Text)
+            {
+                <div style="color:#cbd5e1; font-size:1rem; line-height:1.85; margin-bottom:1.4rem; white-space:pre-wrap;">@block.Content</div>
+            }
+            else if (block.Type == ArticleBlockType.Image && !string.IsNullOrEmpty(block.Content))
+            {
+                <div style="margin:1.6rem 0; text-align:center;">
+                    <img src="@block.Content" alt="Ilustracja"
+                         style="max-width:100%; border-radius:10px; border:1px solid rgba(255,255,255,0.08);" />
+                </div>
+            }
+        }
+
+        @* ── AKCJE ── *@
+        <div style="display:flex; gap:0.8rem; margin-top:2rem; flex-wrap:wrap;">
+            @if (User.IsInRole("Admin") || User.IsInRole("Moderator") || Model.AuthorId == currentUserId)
+            {
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="gw-btn-primary">✏️ Edytuj</a>
+                <form asp-action="Delete" asp-route-id="@Model.Id" method="post" style="margin:0;"
+                      onsubmit="return confirm('Na pewno usunąć artykuł?');">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="gw-btn-outline" style="color:#f87171; border-color:#f87171;">🗑️ Usuń</button>
+                </form>
+            }
+            <a asp-action="Index" asp-route-gameId="@Model.GameId" class="gw-btn-outline">← Wróć</a>
+        </div>
+
+        @* ── SEKCJA KOMENTARZY ── *@
+        <div style="margin-top:3rem;">
+            <h2 style="font-size:1.2rem; font-weight:700; color:#e2e8f0; margin-bottom:1.2rem; border-bottom:1px solid rgba(255,255,255,0.07); padding-bottom:0.6rem;">
+                💬 Komentarze (@allComments.Count)
+            </h2>
+
+            @* Formularz nowego komentarza *@
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <form asp-action="AddComment" asp-route-articleId="@Model.Id" method="post"
+                      style="margin-bottom:2rem;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="articleId" value="@Model.Id" />
+                    <textarea name="content" class="gw-input" rows="3"
+                          placeholder="Napisz komentarz..."
+                          style="resize:vertical; margin-bottom:0.6rem;"></textarea>
+                    <button type="submit" class="gw-btn-primary" style="font-size:0.88rem;">Dodaj komentarz</button>
+                </form>
+            }
+            else
+            {
+                <div class="gw-auth-card" style="text-align:center; padding:1.2rem; margin-bottom:1.5rem;">
+                    <a asp-controller="Account" asp-action="Login" class="gw-action-link">Zaloguj się</a>, żeby dodać komentarz.
+                </div>
+            }
+
+            @* Lista komentarzy *@
+            @foreach (var comment in RootComments())
+            {
+                var commentViewData = new ViewDataDictionary(ViewData);
+                commentViewData["AllComments"] = allComments;
+                commentViewData["MyReactions"] = myReactions;
+                commentViewData["CurrentUserId"] = currentUserId;
+                commentViewData["ArticleId"] = Model.Id;
+                commentViewData["Depth"] = 0;
+                @await Html.PartialAsync("_Comment", comment, commentViewData)
+            }
+        </div>
+    </div>
+</div>

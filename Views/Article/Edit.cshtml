@@ -1,0 +1,175 @@
+﻿@model GameWiki.Models.Article
+@using GameWiki.Models
+@{
+    ViewData["Title"] = "Edytuj artykuł";
+    int initialBlockIndex = Model.Blocks?.Count ?? 0;
+}
+
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card" style="max-width:720px;">
+
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">✏️</div>
+            <h1 class="gw-auth-title">Edytuj artykuł</h1>
+            <p class="gw-auth-sub">@Model.Game?.Title</p>
+        </div>
+
+        <form asp-action="Edit" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" id="editForm">
+            @Html.AntiForgeryToken()
+
+            @* Tytuł *@
+            <div class="gw-form-group">
+                <label class="gw-label">Tytuł</label>
+                <input name="Title" value="@Model.Title" class="gw-input" required maxlength="200" />
+            </div>
+
+            @* Zdjęcie tytułowe *@
+            <div class="gw-form-group">
+                <label class="gw-label">Zdjęcie tytułowe</label>
+                @if (!string.IsNullOrEmpty(Model.CoverImageUrl))
+                {
+                    <div style="margin-bottom:0.6rem;">
+                        <img src="@Model.CoverImageUrl" alt="Obecne zdjęcie tytułowe"
+                             style="max-height:140px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);" />
+                        <p style="font-size:0.78rem; color:#64748b; margin-top:0.3rem;">Obecne zdjęcie. Wgraj nowe, żeby je zastąpić.</p>
+                    </div>
+                }
+                <input type="file" name="CoverImage" accept="image/*" class="gw-input"
+                       style="padding:0.45rem 0.75rem;" id="coverInput" />
+                <div id="coverPreview" style="display:none; margin-top:0.5rem;">
+                    <img id="coverPreviewImg" src="" alt="Podgląd"
+                         style="max-height:140px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);" />
+                </div>
+            </div>
+
+            @* Bloki treści *@
+            <div class="gw-form-group">
+                <label class="gw-label">Treść artykułu</label>
+                <p style="font-size:0.82rem; color:#64748b; margin-bottom:0.8rem;">
+                    Możesz dodawać, usuwać i zmieniać kolejność bloków.
+                </p>
+
+                <div id="blocksContainer" style="display:flex; flex-direction:column; gap:0.8rem;">
+                    @* Istniejące bloki renderujemy z serwera *@
+                    @{
+                        int bi = 0;
+                    }
+                    @foreach (var block in Model.Blocks)
+                    {
+                        if (block.Type == ArticleBlockType.Text)
+                        {
+                            <div class="gw-block-item" style="background:rgba(15,17,23,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:1rem;position:relative;">
+                                <input type="hidden" name="Blocks[@bi].Type" value="0" />
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                                    <span style="font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">📝 Tekst</span>
+                                    <button type="button" onclick="removeBlock(this)" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+                                </div>
+                                <textarea name="Blocks[@bi].TextContent" class="gw-input" rows="5"
+                                  style="resize:vertical;margin:0;">@block.Content</textarea>
+                            </div>
+                        }
+                        else if (block.Type == ArticleBlockType.Image)
+                        {
+                            <div class="gw-block-item" style="background:rgba(15,17,23,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:1rem;position:relative;">
+                                <input type="hidden" name="Blocks[@bi].Type" value="1" />
+                                <input type="hidden" name="Blocks[@bi].ExistingImageUrl" value="@block.Content" />
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                                    <span style="font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">🖼️ Zdjęcie</span>
+                                    <button type="button" onclick="removeBlock(this)" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+                                </div>
+                                @if (!string.IsNullOrEmpty(block.Content))
+                                {
+                                    <img src="@block.Content" alt="Zdjęcie bloku"
+                                         style="max-height:140px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);margin-bottom:0.5rem;" />
+                                    <p style="font-size:0.78rem; color:#64748b; margin-bottom:0.4rem;">Wgraj nowe, żeby zastąpić obecne.</p>
+                                }
+                                <input type="file" name="Blocks[@bi].ImageFile" accept="image/*" class="gw-input"
+                                       style="padding:0.45rem 0.75rem;" onchange="previewBlockImage(this)" />
+                            </div>
+                        }
+                        bi++;
+                    }
+                </div>
+
+                <div style="display:flex; gap:0.6rem; margin-top:0.8rem;">
+                    <button type="button" onclick="addTextBlock()" class="gw-btn-outline" style="font-size:0.85rem;">+ Blok tekstu</button>
+                    <button type="button" onclick="addImageBlock()" class="gw-btn-outline" style="font-size:0.85rem;">+ Zdjęcie</button>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:0.8rem; margin-top:1.8rem;">
+                <button type="submit" class="gw-btn-primary gw-btn-full">💾 Zapisz zmiany</button>
+                <a asp-action="Details" asp-route-id="@Model.Id" class="gw-btn-outline gw-btn-full" style="text-align:center;">Anuluj</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Startowy indeks bloków — kontynuujemy po istniejących
+        let blockIndex = @initialBlockIndex;
+
+        function addTextBlock() {
+            const i = blockIndex++;
+            const container = document.getElementById('blocksContainer');
+            const div = document.createElement('div');
+            div.className = 'gw-block-item';
+            div.style.cssText = 'background:rgba(15,17,23,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:1rem;position:relative;';
+            div.innerHTML = `
+                <input type="hidden" name="Blocks[${i}].Type" value="0" />
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                    <span style="font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">📝 Tekst</span>
+                    <button type="button" onclick="removeBlock(this)" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+                </div>
+                <textarea name="Blocks[${i}].TextContent" class="gw-input" rows="5"
+                          placeholder="Treść bloku..." style="resize:vertical;margin:0;"></textarea>
+            `;
+            container.appendChild(div);
+        }
+
+        function addImageBlock() {
+            const i = blockIndex++;
+            const container = document.getElementById('blocksContainer');
+            const div = document.createElement('div');
+            div.className = 'gw-block-item';
+            div.style.cssText = 'background:rgba(15,17,23,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:1rem;position:relative;';
+            div.innerHTML = `
+                <input type="hidden" name="Blocks[${i}].Type" value="1" />
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                    <span style="font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">🖼️ Zdjęcie</span>
+                    <button type="button" onclick="removeBlock(this)" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+                </div>
+                <input type="file" name="Blocks[${i}].ImageFile" accept="image/*" class="gw-input"
+                       style="padding:0.45rem 0.75rem;" onchange="previewBlockImage(this)" />
+                <div class="block-preview" style="display:none;margin-top:0.5rem;">
+                    <img src="" alt="Podgląd" style="max-height:140px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);" />
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function removeBlock(btn) {
+            btn.closest('.gw-block-item').remove();
+        }
+
+        function previewBlockImage(input) {
+            const preview = input.parentElement.querySelector('.block-preview');
+            if (!preview) return;
+            const img = preview.querySelector('img');
+            if (input.files && input.files[0]) {
+                img.src = URL.createObjectURL(input.files[0]);
+                preview.style.display = 'block';
+            }
+        }
+
+        document.getElementById('coverInput').addEventListener('change', function () {
+            const preview = document.getElementById('coverPreview');
+            const img = document.getElementById('coverPreviewImg');
+            if (this.files && this.files[0]) {
+                img.src = URL.createObjectURL(this.files[0]);
+                preview.style.display = 'block';
+            }
+        });
+    </script>
+}
