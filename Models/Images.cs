@@ -6,6 +6,6 @@
         public string Url { get; set; }
 
         public int? GameId { get; set; }
-        public int? ArticleId { get; set; }
+        public int? ArticleBlockId { get; set; }
     }
 }

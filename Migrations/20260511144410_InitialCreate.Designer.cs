@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameWiki.Migrations
 {
     [DbContext(typeof(GameWikiDbContext))]
-    [Migration("20260509155929_AddBackgroundImageToGame")]
-    partial class AddBackgroundImageToGame
+    [Migration("20260511144410_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -32,27 +32,63 @@ namespace GameWiki.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Content")
-                        .IsRequired()
+                    b.Property<int>("AuthorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CoverImageUrl")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("GameId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
 
                     b.HasIndex("GameId");
 
                     b.ToTable("Articles");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.ArticleBlock", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ArticleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArticleId");
+
+                    b.ToTable("ArticleBlocks");
                 });
 
             modelBuilder.Entity("GameWiki.Models.Comment", b =>
@@ -62,6 +98,9 @@ namespace GameWiki.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ArticleId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Content")
                         .IsRequired()
@@ -79,11 +118,40 @@ namespace GameWiki.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ArticleId");
+
                     b.HasIndex("ParentCommentId");
 
                     b.HasIndex("UserId");
 
                     b.ToTable("Comments");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.CommentReaction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CommentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("CommentId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("CommentReactions");
                 });
 
             modelBuilder.Entity("GameWiki.Models.FavoriteGame", b =>
@@ -95,6 +163,8 @@ namespace GameWiki.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("FavoriteListId", "GameId");
+
+                    b.HasIndex("GameId");
 
                     b.ToTable("FavoriteGames");
                 });
@@ -109,12 +179,15 @@ namespace GameWiki.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("FavoriteLists");
                 });
@@ -204,7 +277,7 @@ namespace GameWiki.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("ArticleId")
+                    b.Property<int?>("ArticleBlockId")
                         .HasColumnType("int");
 
                     b.Property<int?>("GameId")
@@ -216,7 +289,7 @@ namespace GameWiki.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ArticleId");
+                    b.HasIndex("ArticleBlockId");
 
                     b.HasIndex("GameId");
 
@@ -292,35 +365,6 @@ namespace GameWiki.Migrations
                     b.ToTable("Roles");
                 });
 
-            modelBuilder.Entity("GameWiki.Models.Section", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ArticleId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ArticleId");
-
-                    b.ToTable("Sections");
-                });
-
             modelBuilder.Entity("GameWiki.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -329,12 +373,22 @@ namespace GameWiki.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsBanned")
+                        .HasColumnType("bit");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProfilePictureUrl")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Username")
@@ -364,17 +418,42 @@ namespace GameWiki.Migrations
 
             modelBuilder.Entity("GameWiki.Models.Article", b =>
                 {
+                    b.HasOne("GameWiki.Models.User", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("GameWiki.Models.Game", "Game")
                         .WithMany()
                         .HasForeignKey("GameId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Author");
+
                     b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.ArticleBlock", b =>
+                {
+                    b.HasOne("GameWiki.Models.Article", "Article")
+                        .WithMany("Blocks")
+                        .HasForeignKey("ArticleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Article");
                 });
 
             modelBuilder.Entity("GameWiki.Models.Comment", b =>
                 {
+                    b.HasOne("GameWiki.Models.Article", "Article")
+                        .WithMany("Comments")
+                        .HasForeignKey("ArticleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("GameWiki.Models.Comment", "ParentComment")
                         .WithMany()
                         .HasForeignKey("ParentCommentId")
@@ -383,10 +462,61 @@ namespace GameWiki.Migrations
                     b.HasOne("GameWiki.Models.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Article");
+
+                    b.Navigation("ParentComment");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.CommentReaction", b =>
+                {
+                    b.HasOne("GameWiki.Models.Comment", "Comment")
+                        .WithMany("Reactions")
+                        .HasForeignKey("CommentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("ParentComment");
+                    b.HasOne("GameWiki.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Comment");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.FavoriteGame", b =>
+                {
+                    b.HasOne("GameWiki.Models.FavoriteList", "FavoriteList")
+                        .WithMany("FavoriteGames")
+                        .HasForeignKey("FavoriteListId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameWiki.Models.Game", "Game")
+                        .WithMany()
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FavoriteList");
+
+                    b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.FavoriteList", b =>
+                {
+                    b.HasOne("GameWiki.Models.User", "User")
+                        .WithMany("FavoriteLists")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -431,9 +561,9 @@ namespace GameWiki.Migrations
 
             modelBuilder.Entity("GameWiki.Models.Image", b =>
                 {
-                    b.HasOne("GameWiki.Models.Article", null)
+                    b.HasOne("GameWiki.Models.ArticleBlock", null)
                         .WithMany()
-                        .HasForeignKey("ArticleId")
+                        .HasForeignKey("ArticleBlockId")
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("GameWiki.Models.Game", null)
@@ -461,17 +591,6 @@ namespace GameWiki.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("GameWiki.Models.Section", b =>
-                {
-                    b.HasOne("GameWiki.Models.Article", "Article")
-                        .WithMany()
-                        .HasForeignKey("ArticleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Article");
-                });
-
             modelBuilder.Entity("GameWiki.Models.UserRole", b =>
                 {
                     b.HasOne("GameWiki.Models.Role", "Role")
@@ -489,6 +608,23 @@ namespace GameWiki.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Article", b =>
+                {
+                    b.Navigation("Blocks");
+
+                    b.Navigation("Comments");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Comment", b =>
+                {
+                    b.Navigation("Reactions");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.FavoriteList", b =>
+                {
+                    b.Navigation("FavoriteGames");
                 });
 
             modelBuilder.Entity("GameWiki.Models.Game", b =>
@@ -510,6 +646,8 @@ namespace GameWiki.Migrations
 
             modelBuilder.Entity("GameWiki.Models.User", b =>
                 {
+                    b.Navigation("FavoriteLists");
+
                     b.Navigation("Reviews");
                 });
 #pragma warning restore 612, 618
