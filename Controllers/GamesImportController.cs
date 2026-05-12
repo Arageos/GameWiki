@@ -31,10 +31,10 @@ namespace GameWiki.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Import(int rawgId)
         {
-            // Pobierz szczegóły gry (pełny opis, gatunki, platformy)
+            
             var details = await _rawg.GetGameDetailsAsync(rawgId);
 
-            // Sprawdź duplikat
+            
             var exists = await _context.Games.AnyAsync(g => g.Title == details.Name);
             if (exists)
             {
@@ -42,7 +42,7 @@ namespace GameWiki.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            // Parsuj datę (RAWG zwraca "yyyy-MM-dd" lub null)
+            
             DateTime releaseDate = DateTime.MinValue;
             if (!string.IsNullOrEmpty(details.Released))
                 DateTime.TryParse(details.Released, out releaseDate);
@@ -53,11 +53,13 @@ namespace GameWiki.Controllers
                 Description = details.DescriptionRaw ?? "Brak opisu.",
                 ReleaseDate = releaseDate,
                 BackgroundImage = details.BackgroundImage,
+                RawgRating = details.Rating,
+                RawgRatingsCount = details.RatingsCount,
                 GameGenres = new List<GameGenre>(),
                 GamePlatforms = new List<GamePlatform>()
             };
 
-            // Gatunki — dodaj nowe jeśli nie istnieją
+
             if (details.Genres != null)
             {
                 foreach (var rawgGenre in details.Genres)
@@ -72,7 +74,7 @@ namespace GameWiki.Controllers
                 }
             }
 
-            // Platformy — dodaj nowe jeśli nie istnieją
+            
             if (details.Platforms != null)
             {
                 foreach (var wrapper in details.Platforms)

@@ -1,0 +1,107 @@
+﻿@using GameWiki.DTOs.Review
+@model List<ReviewDto>
+@{
+    ViewData["Title"] = "Recenzje — " + ViewBag.GameTitle;
+    int gameId = (int)ViewBag.GameId;
+}
+
+<div class="gw-section">
+    @if (!string.IsNullOrEmpty((string?)ViewBag.BackgroundImage))
+    {
+        <div class="gw-details-banner"
+             style="background-image: url('@ViewBag.BackgroundImage'); height:180px; margin-bottom:2rem;">
+            <div class="gw-details-banner-overlay">
+                <h1 class="gw-details-title" style="font-size:1.8rem;">
+                    Recenzje — @ViewBag.GameTitle
+                </h1>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="gw-section-header" style="text-align:left;">
+            <h1 class="gw-section-title">⭐ Recenzje — @ViewBag.GameTitle</h1>
+        </div>
+    }
+
+    <div style="display:flex; gap:0.8rem; margin-bottom:2rem; flex-wrap:wrap;">
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <a asp-action="Create" asp-route-gameId="@gameId" class="gw-btn-primary">
+                ✍️ Dodaj recenzję
+            </a>
+        }
+        <a asp-controller="Games" asp-action="Details" asp-route-id="@gameId"
+           class="gw-btn-outline">← Wróć do gry</a>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div style="text-align:center; padding:4rem 0; color:#64748b;">
+            <div style="font-size:3rem; margin-bottom:1rem;">💬</div>
+            <p style="font-size:1.1rem;">Brak recenzji. Bądź pierwszy!</p>
+        </div>
+    }
+    else
+    {
+        <div class="gw-reviews-grid">
+            @foreach (var review in Model)
+            {
+                <div class="gw-review-card">
+                    <div class="gw-review-header">
+                        <img src="@(string.IsNullOrEmpty(review.AvatarUrl) ? "/images/default-avatar.png" : review.AvatarUrl)"
+                             class="gw-review-avatar" alt="@review.Username" />
+                        <div class="gw-review-meta">
+                            <span class="gw-review-username">@review.Username</span>
+                            <span class="gw-review-date">@review.CreatedAt.ToString("dd.MM.yyyy")</span>
+                        </div>
+                        <div class="gw-review-stars">
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                <span class="gw-star @(i <= review.Rating ? "filled" : "")">★</span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(review.Content))
+                    {
+                        <div class="gw-review-body" data-expanded="false">
+                            <p class="gw-review-content">@review.Content</p>
+                            <button class="gw-review-expand-btn" onclick="toggleReview(this)">
+                                Pokaż więcej
+                            </button>
+                        </div>
+                    }
+
+                    @if (review.IsOwner)
+                    {
+                        <div class="gw-review-footer">
+                            <a asp-action="Edit" asp-route-id="@review.Id"
+                               class="gw-action-link gw-action-edit">✏️ Edytuj</a>
+                            <span class="gw-action-sep">|</span>
+                            <form asp-action="Delete" asp-route-id="@review.Id" method="post"
+                                  style="display:inline;">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="gw-action-link gw-action-delete"
+                                        style="background:none; border:none; cursor:pointer; font-size:0.83rem; font-weight:600;">
+                                    🗑️ Usuń
+                                </button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        function toggleReview(btn) {
+            const body = btn.closest('.gw-review-body');
+            const expanded = body.dataset.expanded === 'true';
+            body.dataset.expanded = !expanded;
+            btn.textContent = expanded ? 'Pokaż więcej' : 'Pokaż mniej';
+        }
+    </script>
+}

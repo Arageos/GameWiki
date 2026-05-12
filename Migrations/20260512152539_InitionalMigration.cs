@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace GameWiki.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitionalMigration : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -20,7 +20,9 @@ namespace GameWiki.Migrations
                     Title = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", maxLength: 10000, nullable: false),
                     ReleaseDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    BackgroundImage = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    BackgroundImage = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RawgRating = table.Column<double>(type: "float", nullable: true),
+                    RawgRatingsCount = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -192,7 +194,7 @@ namespace GameWiki.Migrations
                     GameId = table.Column<int>(type: "int", nullable: false),
                     UserId = table.Column<int>(type: "int", nullable: false),
                     Rating = table.Column<int>(type: "int", nullable: false),
-                    Content = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: false),
+                    Content = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -209,7 +211,7 @@ namespace GameWiki.Migrations
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(

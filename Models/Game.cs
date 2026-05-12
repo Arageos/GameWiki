@@ -16,8 +16,12 @@ namespace GameWiki.Models
         public DateTime ReleaseDate { get; set; }
 
         public string? BackgroundImage { get; set; }
+        public double? RawgRating { get; set; }
+        public int? RawgRatingsCount { get; set; }
 
         public ICollection<GameGenre> GameGenres { get; set; }
         public ICollection<GamePlatform> GamePlatforms { get; set; }
+
+        public ICollection<Review> Reviews { get; set; } = new List<Review>();
     }
 }

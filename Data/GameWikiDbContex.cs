@@ -77,12 +77,15 @@ public class GameWikiDbContext : DbContext
         // Review
         modelBuilder.Entity<Review>()
             .HasOne(r => r.Game)
-            .WithMany()
-            .HasForeignKey(r => r.GameId);
+            .WithMany(g => g.Reviews)
+            .HasForeignKey(r => r.GameId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         modelBuilder.Entity<Review>()
             .HasOne(r => r.User)
             .WithMany(u => u.Reviews)
-            .HasForeignKey(r => r.UserId);
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // Article
         modelBuilder.Entity<Article>()

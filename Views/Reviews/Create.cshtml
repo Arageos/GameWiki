@@ -1,0 +1,69 @@
+﻿@using GameWiki.DTOs.Review
+@model CreateReviewDto
+@{
+    ViewData["Title"] = "Dodaj recenzję";
+}
+
+<div class="gw-auth-wrapper">
+    <div class="gw-auth-card" style="max-width:560px;">
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">✍️</div>
+            <h1 class="gw-auth-title">Dodaj recenzję</h1>
+            <p class="gw-auth-sub">@ViewBag.GameTitle</p>
+        </div>
+
+        <form asp-action="Create" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="GameId" />
+
+            <div class="gw-form-group">
+                <label class="gw-label">Ocena</label>
+                <div class="gw-star-picker" id="starPicker">
+                    @for (int i = 1; i <= 5; i++)
+                    {
+                        <span class="gw-star-pick" data-value="@i">★</span>
+                    }
+                </div>
+                <input type="hidden" asp-for="Rating" id="ratingInput" />
+                <span asp-validation-for="Rating" class="gw-field-error"></span>
+            </div>
+
+            <div class="gw-form-group">
+                <label asp-for="Content" class="gw-label">Recenzja <span style="color:#64748b;">(opcjonalnie)</span></label>
+                <textarea asp-for="Content" class="gw-input" rows="5"
+                          placeholder="Podziel się swoją opinią..."></textarea>
+                <span asp-validation-for="Content" class="gw-field-error"></span>
+            </div>
+
+            <div style="display:flex; gap:0.8rem; margin-top:1.5rem;">
+                <button type="submit" class="gw-btn-primary gw-btn-full">
+                    ⭐ Wyślij recenzję
+                </button>
+                <a asp-controller="Games" asp-action="Details" asp-route-id="@Model.GameId"
+                   class="gw-btn-outline gw-btn-full" style="text-align:center;">Anuluj</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const stars = document.querySelectorAll('.gw-star-pick');
+        const input = document.getElementById('ratingInput');
+
+        stars.forEach(star => {
+            star.addEventListener('click', () => {
+                const val = parseInt(star.dataset.value);
+                input.value = val;
+                stars.forEach((s, i) => s.classList.toggle('active', i < val));
+            });
+            star.addEventListener('mouseover', () => {
+                const val = parseInt(star.dataset.value);
+                stars.forEach((s, i) => s.classList.toggle('hover', i < val));
+            });
+            star.addEventListener('mouseout', () => {
+                stars.forEach(s => s.classList.remove('hover'));
+            });
+        });
+    </script>
+}

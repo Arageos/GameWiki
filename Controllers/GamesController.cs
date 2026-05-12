@@ -32,12 +32,13 @@ namespace GameWiki.Controllers
             return View(games);
         }
 
-        
+
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null) return NotFound();
 
             var game = await _context.Games
+                .Include(g => g.Reviews)
                 .Where(g => g.Id == id)
                 .Select(g => new GameDto
                 {
@@ -45,21 +46,18 @@ namespace GameWiki.Controllers
                     Title = g.Title,
                     Description = g.Description,
                     ReleaseDate = g.ReleaseDate,
-                    BackgroundImage = g.BackgroundImage
+                    BackgroundImage = g.BackgroundImage,
+                    RawgRating = g.RawgRating,
+                    RawgRatingsCount = g.RawgRatingsCount,
+                    LocalRating = g.Reviews.Any()
+                        ? Math.Round(g.Reviews.Average(r => r.Rating), 1)
+                        : null,
+                    LocalRatingsCount = g.Reviews.Count()
                 })
                 .FirstOrDefaultAsync();
 
             if (game == null) return NotFound();
-            if (User.Identity?.IsAuthenticated == true)
-            {
-                var userIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                if (int.TryParse(userIdStr, out int userId))
-                {
-                    ViewBag.UserLists = await _context.FavoriteLists
-                        .Where(l => l.UserId == userId)
-                        .ToListAsync();
-                }
-            }
+
             return View(game);
         }
 

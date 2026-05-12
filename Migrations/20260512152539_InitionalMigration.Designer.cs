@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameWiki.Migrations
 {
     [DbContext(typeof(GameWikiDbContext))]
-    [Migration("20260511144410_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260512152539_InitionalMigration")]
+    partial class InitionalMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -208,6 +208,12 @@ namespace GameWiki.Migrations
                         .HasMaxLength(10000)
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<double?>("RawgRating")
+                        .HasColumnType("float");
+
+                    b.Property<int?>("RawgRatingsCount")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("ReleaseDate")
                         .HasColumnType("datetime2");
 
@@ -323,7 +329,6 @@ namespace GameWiki.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Content")
-                        .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
@@ -575,7 +580,7 @@ namespace GameWiki.Migrations
             modelBuilder.Entity("GameWiki.Models.Review", b =>
                 {
                     b.HasOne("GameWiki.Models.Game", "Game")
-                        .WithMany()
+                        .WithMany("Reviews")
                         .HasForeignKey("GameId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -583,7 +588,7 @@ namespace GameWiki.Migrations
                     b.HasOne("GameWiki.Models.User", "User")
                         .WithMany("Reviews")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Game");
@@ -632,6 +637,8 @@ namespace GameWiki.Migrations
                     b.Navigation("GameGenres");
 
                     b.Navigation("GamePlatforms");
+
+                    b.Navigation("Reviews");
                 });
 
             modelBuilder.Entity("GameWiki.Models.Genre", b =>
