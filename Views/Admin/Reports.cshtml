@@ -1,0 +1,85 @@
+﻿@model IEnumerable<GameWiki.DTOs.Admin.ReportItemDto>
+@{
+    ViewData["Title"] = "Zgłoszenia Użytkowników";
+}
+
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-white fw-bold">Zgłoszone treści 🚩</h2>
+        <a asp-action="Index" class="btn btn-outline-light">Wróć do Panelu Administracyjnego</a>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="alert text-center" style="background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px dashed rgba(255,255,255,0.2);">
+            Hurra! Brak oczekujących zgłoszeń. Społeczność zachowuje się wzorowo.
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var report in Model)
+            {
+                <div class="col-12 mb-4">
+                    <div class="gw-card p-4" style="background: #1a1d26; border-radius: 12px; border-left: 4px solid #f59e0b;">
+
+                        <div class="d-flex justify-content-between mb-3 border-bottom border-secondary pb-2">
+                            <div>
+                                <span class="badge bg-warning text-dark me-2 text-uppercase">@report.Type.ToString()</span>
+                                <span class="text-muted small">
+                                    Zgłoszone przez: <strong class="text-light">@report.ReporterName</strong>
+                                    &nbsp;·&nbsp; @report.CreatedAt.ToString("dd.MM.yyyy HH:mm")
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <span class="text-uppercase small fw-bold" style="color: #94a3b8;">Powód zgłoszenia:</span>
+                            <p class="text-white fst-italic mt-1">"@report.Reason"</p>
+                        </div>
+
+                        @if (report.Type == GameWiki.Models.ReportType.Comment || report.Type == GameWiki.Models.ReportType.Review)
+                        {
+                            <div class="p-3 mb-4 rounded" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05);">
+                                <span class="text-muted small">
+                                    Autor zablokowanej treści: <strong class="text-info">@report.ContentAuthorName</strong>
+                                </span>
+                                <p class="text-light mt-2 mb-0">@report.ContentText</p>
+                            </div>
+                        }
+
+                        <div class="d-flex gap-2">
+                            @if (report.Type == GameWiki.Models.ReportType.Article)
+                            {
+                                <a href="/Article/Details/@report.TargetId" class="btn btn-primary btn-sm">Przejdź do artykułu</a>
+                            }
+
+                            <form asp-action="HandleReport" method="post" class="m-0">
+                                <input type="hidden" name="reportId" value="@report.ReportId" />
+                                <input type="hidden" name="actionType" value="dismiss" />
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">Zignoruj zgłoszenie</button>
+                            </form>
+
+                            @if (report.Type == GameWiki.Models.ReportType.Comment || report.Type == GameWiki.Models.ReportType.Review)
+                            {
+                                <form asp-action="HandleReport" method="post" class="m-0">
+                                    <input type="hidden" name="reportId" value="@report.ReportId" />
+                                    <input type="hidden" name="actionType" value="delete" />
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Na pewno usunąć tę treść? To działanie jest nieodwracalne.');">Usuń treść</button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

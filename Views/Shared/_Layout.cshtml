@@ -69,17 +69,18 @@
                                 </li>
                                 @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
                                 {
+                                    <li><hr class="dropdown-divider border-secondary"></li>
                                     <li class="nav-item">
                                         <a class="nav-link" asp-controller="Report" asp-action="Index">📊 Raporty</a>
                                     </li>
-                                }
-                                @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
-                                {
                                     <li>
                                         <a class="dropdown-item text-warning" asp-controller="Admin" asp-action="Index">🛡️ Panel Zarządzania</a>
                                     </li>
                                     <li class="nav-item">
                                         <a class="dropdown-item text-info"  asp-controller="GamesImport" asp-action="Index" class="nav-link">📥 Import RAWG</a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item text-danger" asp-controller="Admin" asp-action="Reports">🚩 Zgłoszenia</a>
                                     </li>
                                     <li><hr class="dropdown-divider border-secondary"></li>
                                 }
@@ -115,6 +116,52 @@
         <div class="container">
             &copy; 2026 - GameWiki
         </div>
+        <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark text-light border-secondary">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title text-warning">🚩 Zgłoś naruszenie</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form asp-controller="Reports" asp-action="Create" method="post">
+                        <div class="modal-body">
+                            <input type="hidden" name="type" id="reportType" value="" />
+                            <input type="hidden" name="targetId" id="reportTargetId" value="" />
+                            <input type="hidden" name="returnUrl" id="reportReturnUrl" value="" />
+
+                            <p class="small text-muted mb-3">Opisz krótko, dlaczego zgłaszasz ten materiał. Administracja rozpatrzy to najszybciej, jak to możliwe.</p>
+
+                            <div class="mb-3">
+                                <label class="form-label text-uppercase small fw-bold" style="color: #94a3b8;">Powód zgłoszenia:</label>
+                                <textarea name="reason" class="form-control bg-dark text-light border-secondary" rows="4" required maxlength="500"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-outline-light rounded-pill" data-bs-dismiss="modal">Anuluj</button>
+                            <button type="submit" class="btn btn-warning rounded-pill">Wyślij zgłoszenie</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var reportModal = document.getElementById('reportModal');
+                if (reportModal) {
+                    reportModal.addEventListener('show.bs.modal', function (event) {
+                        var button = event.relatedTarget;
+                        var type = button.getAttribute('data-report-type');
+                        var targetId = button.getAttribute('data-report-targetid');
+                        var returnUrl = window.location.pathname + window.location.search;
+
+                        reportModal.querySelector('#reportType').value = type;
+                        reportModal.querySelector('#reportTargetId').value = targetId;
+                        reportModal.querySelector('#reportReturnUrl').value = returnUrl;
+                    });
+                }
+            });
+        </script>
     </footer>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>

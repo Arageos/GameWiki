@@ -23,7 +23,20 @@
             <h1 class="gw-section-title">⭐ Recenzje — @ViewBag.GameTitle</h1>
         </div>
     }
-
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-3">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
     <div style="display:flex; gap:0.8rem; margin-bottom:2rem; flex-wrap:wrap;">
         @if (User.Identity?.IsAuthenticated == true)
         {
@@ -88,6 +101,16 @@
                                 </button>
                             </form>
                         </div>
+                    }
+                    @if (User.Identity?.IsAuthenticated == true && !review.IsOwner)
+                    {
+                        <button type="button" class="btn btn-link text-warning p-0 ms-3 text-decoration-none" style="font-size: 0.85rem;"
+                                data-bs-toggle="modal"
+                                data-bs-target="#reportModal"
+                                data-report-type="Review"
+                                data-report-targetid="@review.Id">
+                            🚩 Zgłoś
+                        </button>
                     }
                 </div>
             }

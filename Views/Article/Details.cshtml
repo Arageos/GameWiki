@@ -59,7 +59,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
-
+    
     @* ── TREŚĆ ARTYKUŁU ── *@
     <div style="max-width:780px; margin:2rem auto 0;">
         @foreach (var block in Model.Blocks)
@@ -89,6 +89,16 @@
                 </form>
             }
             <a asp-action="Index" asp-route-gameId="@Model.GameId" class="gw-btn-outline">← Wróć</a>
+            @if (User.Identity?.IsAuthenticated == true && Model.AuthorId.ToString() != User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)
+            {
+                <button type="button" class="btn btn-sm btn-outline-warning ms-3 rounded-pill"
+                        data-bs-toggle="modal"
+                        data-bs-target="#reportModal"
+                        data-report-type="Article"
+                        data-report-targetid="@Model.Id">
+                    🚩 Zgłoś artykuł
+                </button>
+            }
         </div>
 
         @* ── SEKCJA KOMENTARZY ── *@

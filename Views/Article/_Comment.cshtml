@@ -98,6 +98,17 @@
                         💬 Odpowiedz
                     </button>
                 }
+                @if (Model.UserId != currentUserId)
+                {
+                    <button type="button"
+                            style="background:none; border:none; color:#f59e0b; cursor:pointer; font-size:0.82rem; padding:0.2rem 0.4rem; margin-left: auto;"
+                            data-bs-toggle="modal"
+                            data-bs-target="#reportModal"
+                            data-report-type="Comment"
+                            data-report-targetid="@Model.Id">
+                        🚩 Zgłoś
+                    </button>
+                }
             }
             else
             {

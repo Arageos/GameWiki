@@ -14,5 +14,6 @@ namespace GameWiki.Models
         [MaxLength(2000)]
         public string? Content { get; set; }
         public DateTime CreatedAt { get; set; }
+        public bool IsVerified { get; set; } = false;
     }
 }

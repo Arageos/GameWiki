@@ -22,5 +22,6 @@ namespace GameWiki.Models
         public Comment ParentComment { get; set; }
 
         public ICollection<CommentReaction> Reactions { get; set; }
+        public bool IsVerified { get; set; } = false;
     }
 }

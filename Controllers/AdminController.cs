@@ -129,5 +129,93 @@ namespace GameWiki.Controllers
 
             return View(articles);
         }
+        // --- PANEL ZGŁOSZEŃ ---
+        public async Task<IActionResult> Reports()
+        {
+            var reports = await _context.Reports
+                .Include(r => r.Reporter)
+                .Where(r => r.Status == ReportStatus.Pending)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync();
+
+            var reportDtos = new List<GameWiki.DTOs.Admin.ReportItemDto>();
+
+            foreach (var r in reports)
+            {
+                var dto = new GameWiki.DTOs.Admin.ReportItemDto
+                {
+                    ReportId = r.Id,
+                    ReporterName = r.Reporter.Username,
+                    Type = r.Type,
+                    TargetId = r.TargetId,
+                    Reason = r.Reason,
+                    CreatedAt = r.CreatedAt
+                };
+
+                // Dociągamy treść w zależności od tego, co zgłoszono
+                if (r.Type == ReportType.Comment)
+                {
+                    var comment = await _context.Comments.Include(c => c.User).FirstOrDefaultAsync(c => c.Id == r.TargetId);
+                    dto.ContentText = comment != null ? comment.Content : "[Treść została usunięta]";
+                    dto.ContentAuthorName = comment?.User?.Username ?? "Nieznany";
+                }
+                else if (r.Type == ReportType.Review)
+                {
+                    var review = await _context.Reviews.Include(rev => rev.User).FirstOrDefaultAsync(rev => rev.Id == r.TargetId);
+                    dto.ContentText = review != null ? review.Content : "[Treść została usunięta]";
+                    dto.ContentAuthorName = review?.User?.Username ?? "Nieznany";
+                }
+
+                reportDtos.Add(dto);
+            }
+
+            return View(reportDtos);
+        }
+
+        // --- ROZPATRYWANIE ZGŁOSZEŃ ---
+        [HttpPost]
+        public async Task<IActionResult> HandleReport(int reportId, string actionType)
+        {
+            var report = await _context.Reports.FindAsync(reportId);
+            if (report == null) return NotFound();
+
+            if (actionType == "delete")
+            {
+                // Usuwamy złą treść
+                if (report.Type == ReportType.Comment)
+                {
+                    var comment = await _context.Comments.FindAsync(report.TargetId);
+                    if (comment != null)
+                    {
+                        // 1. Najpierw znajdujemy i usuwamy wszystkie odpowiedzi do tego komentarza
+                        var replies = await _context.Comments.Where(c => c.ParentCommentId == comment.Id).ToListAsync();
+                        if (replies.Any())
+                        {
+                            _context.Comments.RemoveRange(replies);
+                        }
+
+                        // 2. Dopiero potem usuwamy główny komentarz
+                        _context.Comments.Remove(comment);
+                    }
+                }
+                else if (report.Type == ReportType.Review)
+                {
+                    var review = await _context.Reviews.FindAsync(report.TargetId);
+                    if (review != null) _context.Reviews.Remove(review);
+                }
+
+                TempData["SuccessMessage"] = "Treść została pomyślnie usunięta, a zgłoszenie zamknięte.";
+            }
+            else if (actionType == "dismiss")
+            {
+                TempData["SuccessMessage"] = "Zgłoszenie zostało odrzucone.";
+            }
+
+            // Oznaczamy zgłoszenie jako załatwione
+            report.Status = ReportStatus.Resolved;
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Reports));
+        }
     }
 }
