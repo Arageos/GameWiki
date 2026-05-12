@@ -69,6 +69,12 @@
                                 </li>
                                 @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
                                 {
+                                    <li class="nav-item">
+                                        <a class="nav-link" asp-controller="Report" asp-action="Index">📊 Raporty</a>
+                                    </li>
+                                }
+                                @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+                                {
                                     <li>
                                         <a class="dropdown-item text-warning" asp-controller="Admin" asp-action="Index">🛡️ Panel Zarządzania</a>
                                     </li>

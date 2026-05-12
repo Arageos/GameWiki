@@ -1,8 +1,8 @@
 ﻿@using System.Security.Claims
-@inject GameWikiDbContext _context
 @model GameWiki.Models.User
 @{
     ViewData["Title"] = "Mój Profil";
+    var articles = ViewBag.UserArticles as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>();
 }
 
 <div class="container py-5">
@@ -12,7 +12,8 @@
                 <div class="text-center mb-4">
                     @if (!string.IsNullOrEmpty(Model.ProfilePictureUrl))
                     {
-                        <img src="@Model.ProfilePictureUrl" alt="Avatar" class="rounded-circle mx-auto d-block mb-3" style="width: 100px; height: 100px; object-fit: cover; border: 3px solid #6366f1; box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);" />
+                        <img src="@Model.ProfilePictureUrl" alt="Avatar" class="rounded-circle mx-auto d-block mb-3"
+                             style="width: 100px; height: 100px; object-fit: cover; border: 3px solid #6366f1; box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);" />
                     }
                     else
                     {
@@ -35,19 +36,21 @@
                             _ => "nav-badge-user"
                         };
                     }
-                    <span class="@badgeClass px-3 py-2 mt-2" style="font-size: 0.9rem;">
-                        @ViewBag.RoleName
-                    </span>
+                    <span class="@badgeClass px-3 py-2 mt-2" style="font-size: 0.9rem;">@ViewBag.RoleName</span>
                 </div>
 
                 <div class="row mt-5 text-center">
-                    <div class="col-sm-6 mb-4">
+                    <div class="col-sm-4 mb-4">
                         <label class="small text-uppercase fw-bold" style="color: #94a3b8; letter-spacing: 1px;">Adres Email</label>
                         <p class="fs-5 text-white mt-1">@Model.Email</p>
                     </div>
-                    <div class="col-sm-6 mb-4">
-                        <label class="small text-uppercase fw-bold" style="color: #94a3b8; letter-spacing: 1px;">Aktywność</label>
-                        <p class="fs-5 text-white mt-1">@(Model.Reviews?.Count ?? 0) napisanych recenzji</p>
+                    <div class="col-sm-4 mb-4">
+                        <label class="small text-uppercase fw-bold" style="color: #94a3b8; letter-spacing: 1px;">Recenzje</label>
+                        <p class="fs-5 text-white mt-1">@(Model.Reviews?.Count ?? 0)</p>
+                    </div>
+                    <div class="col-sm-4 mb-4">
+                        <label class="small text-uppercase fw-bold" style="color: #94a3b8; letter-spacing: 1px;">Artykuły</label>
+                        <p class="fs-5 text-white mt-1">@articles.Count()</p>
                     </div>
                 </div>
 
@@ -57,29 +60,99 @@
             </div>
         </div>
     </div>
-    <div class="row justify-content-center mt-5">
-        <div class="col-md-8">
-            @if (TempData["SuccessMessage"] != null)
-            {
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="row justify-content-center mt-3">
+            <div class="col-md-8">
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     @TempData["SuccessMessage"]
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
-            }
-            else if(TempData["ErrorMessage"] != null)
-            {
+            </div>
+        </div>
+    }
+    else if (TempData["ErrorMessage"] != null)
+    {
+        <div class="row justify-content-center mt-3">
+            <div class="col-md-8">
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
                     @TempData["ErrorMessage"]
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- SEKCJA: MOJE ARTYKUŁY -->
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3 class="text-white fw-bold mb-0">Moje Artykuły 📝</h3>
+                <a asp-controller="Articles" asp-action="Create" class="gw-btn-primary" style="font-size: 0.85rem; padding: 0.5rem 1.2rem;">
+                    + Napisz artykuł
+                </a>
+            </div>
+
+            @if (articles.Any())
+            {
+                <div class="d-flex flex-column gap-3">
+                    @foreach (var article in articles)
+                    {
+                        <div style="background: #1a1d26; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); padding: 1rem 1.25rem;">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <a asp-controller="Articles" asp-action="Details" asp-route-id="@article.Id"
+                                       class="text-white fw-bold text-decoration-none fs-6">
+                                        @article.Title
+                                    </a>
+                                    <div class="mt-1" style="font-size: 0.8rem; color: #64748b;">
+                                        🎮 @article.GameTitle &nbsp;·&nbsp;
+                                        📅 @((DateTime)article.CreatedAt).ToString("dd.MM.yyyy")
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    @if ((bool)article.IsVerified)
+                                    {
+                                        <span style="background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); border-radius: 6px; font-size: 0.75rem; padding: 0.2rem 0.6rem; font-weight: 600;">
+                                            ✓ Zweryfikowany
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span style="background: rgba(234,179,8,0.15); color: #eab308; border: 1px solid rgba(234,179,8,0.3); border-radius: 6px; font-size: 0.75rem; padding: 0.2rem 0.6rem; font-weight: 600;">
+                                            ⏳ Oczekuje
+                                        </span>
+                                    }
+                                    <a asp-controller="Articles" asp-action="Edit" asp-route-id="@article.Id"
+                                       class="btn btn-sm btn-outline-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.6rem;">
+                                        Edytuj
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    }
                 </div>
             }
+            else
+            {
+                <div class="alert text-center" style="background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px dashed rgba(255,255,255,0.2);">
+                    Nie napisałeś jeszcze żadnego artykułu.
+                    <a asp-controller="Articles" asp-action="Create" style="color: #a78bfa;">Napisz pierwszy!</a>
+                </div>
+            }
+        </div>
+    </div>
 
+    <!-- SEKCJA: MOJE KOLEKCJE -->
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-8">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3 class="text-white fw-bold mb-0">Moje Kolekcje 📁</h3>
-
                 <form asp-controller="Favorites" asp-action="CreateList" method="post" class="d-flex">
                     <input type="hidden" name="returnUrl" value="/Account/Profile" />
-                    <input type="text" name="name" class="form-control bg-dark text-light border-secondary me-2" placeholder="Nazwa nowej listy..." required maxlength="50" />
+                    <input type="text" name="name" class="form-control bg-dark text-light border-secondary me-2"
+                           placeholder="Nazwa nowej listy..." required maxlength="50" />
                     <button type="submit" class="btn btn-primary rounded-pill px-4">+</button>
                 </form>
             </div>
@@ -91,21 +164,16 @@
                     {
                         <div class="col-md-6 mb-4">
                             <div class="gw-card p-3 h-100" style="background: #1a1d26; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
-
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h5 class="text-white fw-bold m-0">@list.Name</h5>
-
                                     <div class="d-flex align-items-center gap-3">
                                         <span class="small text-uppercase fw-bold" style="color: #94a3b8; letter-spacing: 1px;">
                                             Gier: @list.FavoriteGames.Count
                                         </span>
-
                                         <form asp-controller="Favorites" asp-action="DeleteList" method="post" class="m-0"
                                               onsubmit="return confirm('Czy na pewno chcesz usunąć całą kolekcję @list.Name?');">
                                             <input type="hidden" name="listId" value="@list.Id" />
-                                            <button type="submit" class="btn btn-link text-danger p-0 text-decoration-none fs-5" title="Usuń kolekcję" style="line-height: 1;">
-                                                🗑️
-                                            </button>
+                                            <button type="submit" class="btn btn-link text-danger p-0 text-decoration-none fs-5" title="Usuń kolekcję">🗑️</button>
                                         </form>
                                     </div>
                                 </div>
@@ -114,7 +182,8 @@
                                     <input type="hidden" name="listId" value="@list.Id" />
                                     <input type="hidden" name="returnUrl" value="/Account/Profile" />
                                     <div class="input-group input-group-sm">
-                                        <select name="gameId" class="form-select bg-dark text-light border-secondary" style="border-top-left-radius: 20px; border-bottom-left-radius: 20px;" required>
+                                        <select name="gameId" class="form-select bg-dark text-light border-secondary"
+                                                style="border-top-left-radius: 20px; border-bottom-left-radius: 20px;" required>
                                             <option value="">--Wybierz grę--</option>
                                             @if (ViewBag.AllGames != null)
                                             {
@@ -124,7 +193,10 @@
                                                 }
                                             }
                                         </select>
-                                        <button class="btn btn-primary px-3" type="submit" style="border-top-right-radius: 20px; border-bottom-right-radius: 20px;">Dodaj</button>
+                                        <button class="btn btn-primary px-3" type="submit"
+                                                style="border-top-right-radius: 20px; border-bottom-right-radius: 20px;">
+                                            Dodaj
+                                        </button>
                                     </div>
                                 </form>
 
@@ -135,7 +207,6 @@
                                         {
                                             <div class="badge bg-dark border border-secondary d-flex align-items-center p-0 overflow-hidden" style="font-size: 0.75rem;">
                                                 <span class="px-2 py-2 text-white">@item.Game.Title</span>
-
                                                 <form asp-controller="Favorites" asp-action="RemoveFromFavorite" method="post" class="m-0">
                                                     <input type="hidden" name="gameId" value="@item.GameId" />
                                                     <input type="hidden" name="listId" value="@list.Id" />

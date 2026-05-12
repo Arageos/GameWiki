@@ -20,38 +20,30 @@ namespace GameWiki.Controllers
             _env = env;
         }
 
-        // GET: Account/Register
         public IActionResult Register()
         {
             if (User.Identity?.IsAuthenticated == true)
                 return RedirectToAction("Index", "Home");
-
             return View();
         }
 
-        // POST: Account/Register
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterDto dto)
         {
-            if (!ModelState.IsValid)
-                return View(dto);
+            if (!ModelState.IsValid) return View(dto);
 
-            // Sprawdź czy email już istnieje
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
             {
                 ModelState.AddModelError("Email", "Ten email jest już zajęty");
                 return View(dto);
             }
-
-            // Sprawdź czy nazwa użytkownika już istnieje
             if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
             {
                 ModelState.AddModelError("Username", "Ta nazwa użytkownika jest już zajęta");
                 return View(dto);
             }
 
-            // Pobierz lub utwórz rolę "User"
             var userRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "User");
             if (userRole == null)
             {
@@ -60,7 +52,6 @@ namespace GameWiki.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            // Utwórz użytkownika
             var user = new User
             {
                 Username = dto.Username,
@@ -71,54 +62,40 @@ namespace GameWiki.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Przypisz rolę
-            _context.UserRoles.Add(new UserRole
-            {
-                UserId = user.Id,
-                RoleId = userRole.Id
-            });
+            _context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = userRole.Id });
             await _context.SaveChangesAsync();
 
-            // Zaloguj od razu po rejestracji
             await SignInUser(user, userRole.Name, false);
-
             return RedirectToAction("Index", "Home");
         }
 
-        // GET: Account/Login
         public IActionResult Login(string? returnUrl = null)
         {
             if (User.Identity?.IsAuthenticated == true)
                 return RedirectToAction("Index", "Home");
-
             ViewData["ReturnUrl"] = returnUrl;
             return View();
         }
 
-        // POST: Account/Login
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginDto dto, string? returnUrl = null)
         {
-            if (!ModelState.IsValid)
-                return View(dto);
+            if (!ModelState.IsValid) return View(dto);
 
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == dto.Email);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             {
                 ModelState.AddModelError(string.Empty, "Nieprawidłowy email lub hasło");
                 return View(dto);
             }
-
             if (user.IsBanned)
             {
                 ModelState.AddModelError(string.Empty, "Zostałeś zablokowany. Skontaktuj się z administracją.");
                 return View(dto);
             }
 
-            // Pobierz rolę użytkownika
             var userRole = await _context.UserRoles
                 .Include(ur => ur.Role)
                 .Where(ur => ur.UserId == user.Id)
@@ -133,7 +110,6 @@ namespace GameWiki.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        // POST: Account/Logout
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
@@ -142,13 +118,8 @@ namespace GameWiki.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        // GET: Account/AccessDenied
-        public IActionResult AccessDenied()
-        {
-            return View();
-        }
+        public IActionResult AccessDenied() => View();
 
-        // Pomocnicza metoda do logowania
         private async Task SignInUser(User user, string role, bool rememberMe)
         {
             var claims = new List<Claim>
@@ -160,15 +131,11 @@ namespace GameWiki.Controllers
                 new Claim("AvatarUrl", user.ProfilePictureUrl ?? "")
             };
 
-            var claimsIdentity = new ClaimsIdentity(
-                claims, CookieAuthenticationDefaults.AuthenticationScheme);
-
+            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             var authProperties = new AuthenticationProperties
             {
                 IsPersistent = rememberMe,
-                ExpiresUtc = rememberMe
-                    ? DateTimeOffset.UtcNow.AddDays(30)
-                    : DateTimeOffset.UtcNow.AddHours(8)
+                ExpiresUtc = rememberMe ? DateTimeOffset.UtcNow.AddDays(30) : DateTimeOffset.UtcNow.AddHours(8)
             };
 
             await HttpContext.SignInAsync(
@@ -176,12 +143,12 @@ namespace GameWiki.Controllers
                 new ClaimsPrincipal(claimsIdentity),
                 authProperties);
         }
+
         [Authorize]
         public async Task<IActionResult> Profile()
         {
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null) return NotFound();
-
             int userId = int.Parse(userIdClaim.Value);
 
             var user = await _context.Users
@@ -206,14 +173,30 @@ namespace GameWiki.Controllers
 
             ViewBag.RoleName = role;
 
+            // Artykuły użytkownika
+            ViewBag.UserArticles = await _context.Articles
+                .Include(a => a.Game)
+                .Where(a => a.AuthorId == userId)
+                .OrderByDescending(a => a.CreatedAt)
+                .Select(a => new
+                {
+                    a.Id,
+                    a.Title,
+                    a.IsVerified,
+                    a.CreatedAt,
+                    GameTitle = a.Game.Title,
+                    GameId = a.GameId
+                })
+                .ToListAsync();
+
             return View(user);
         }
+
         [Authorize]
         public async Task<IActionResult> Settings()
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             var user = await _context.Users.FindAsync(userId);
-
             if (user == null) return NotFound();
 
             var dto = new UpdateProfileDto
@@ -234,7 +217,6 @@ namespace GameWiki.Controllers
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             var user = await _context.Users.FindAsync(userId);
-
             if (user == null) return NotFound();
 
             if (!ModelState.IsValid)
@@ -243,13 +225,11 @@ namespace GameWiki.Controllers
                 return View("Settings", dto);
             }
 
-            // Sprawdzanie unikalności emaila/loginu jeśli zostały zmienione
             if (dto.Email != user.Email && await _context.Users.AnyAsync(u => u.Email == dto.Email))
             {
                 ModelState.AddModelError("Email", "Ten email jest już zajęty");
                 return View("Settings", dto);
             }
-
             if (dto.Username != user.Username && await _context.Users.AnyAsync(u => u.Username == dto.Username))
             {
                 ModelState.AddModelError("Username", "Ta nazwa użytkownika jest już zajęta");
@@ -259,12 +239,13 @@ namespace GameWiki.Controllers
             user.Username = dto.Username;
             user.Email = dto.Email;
             user.Description = dto.Description;
-
             await _context.SaveChangesAsync();
 
-            // Konieczność przelogowania, aby odświeżyć Claimsy z nową nazwą/emailem
-            var role = await _context.UserRoles.Include(ur => ur.Role).Where(ur => ur.UserId == user.Id).Select(ur => ur.Role.Name).FirstOrDefaultAsync() ?? "User";
-            await SignInUser(user, role, true); // Odświeżenie ciasteczka
+            var role = await _context.UserRoles.Include(ur => ur.Role)
+                .Where(ur => ur.UserId == user.Id)
+                .Select(ur => ur.Role.Name)
+                .FirstOrDefaultAsync() ?? "User";
+            await SignInUser(user, role, true);
 
             TempData["SuccessMessage"] = "Profil został zaktualizowany.";
             return RedirectToAction(nameof(Settings));
@@ -278,7 +259,8 @@ namespace GameWiki.Controllers
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             var user = await _context.Users.FindAsync(userId);
 
-            if (!ModelState.IsValid) return View("Settings", new UpdateProfileDto { Username = user!.Username, Email = user.Email, Description = user.Description });
+            if (!ModelState.IsValid)
+                return View("Settings", new UpdateProfileDto { Username = user!.Username, Email = user.Email, Description = user.Description });
 
             if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user!.PasswordHash))
             {
@@ -300,7 +282,6 @@ namespace GameWiki.Controllers
         {
             if (avatarFile != null && avatarFile.Length > 0)
             {
-                // Sprawdzenie rozszerzenia (tylko png/jpg)
                 var ext = Path.GetExtension(avatarFile.FileName).ToLower();
                 if (ext != ".png" && ext != ".jpg" && ext != ".jpeg")
                 {
@@ -308,30 +289,26 @@ namespace GameWiki.Controllers
                     return RedirectToAction(nameof(Settings));
                 }
 
-                // Generowanie unikalnej nazwy i ścieżki
                 var uploadsFolder = Path.Combine(_env.WebRootPath, "images", "avatars");
-                Directory.CreateDirectory(uploadsFolder); // Tworzy folder, jeśli nie istnieje
+                Directory.CreateDirectory(uploadsFolder);
 
                 var uniqueFileName = Guid.NewGuid().ToString() + "_" + avatarFile.FileName;
                 var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
                 using (var fileStream = new FileStream(filePath, FileMode.Create))
-                {
                     await avatarFile.CopyToAsync(fileStream);
-                }
 
                 var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
                 var user = await _context.Users.FindAsync(userId);
 
                 user!.ProfilePictureUrl = $"/images/avatars/{uniqueFileName}";
                 await _context.SaveChangesAsync();
-                var role = await _context.UserRoles
-                .Include(ur => ur.Role)
-                .Where(ur => ur.UserId == user.Id)
-                .Select(ur => ur.Role.Name)
-                .FirstOrDefaultAsync() ?? "User";
 
-                // Ponowne wywołanie SignInUser odświeży dane w ciasteczku (w tym nasz nowy AvatarUrl)
+                var role = await _context.UserRoles.Include(ur => ur.Role)
+                    .Where(ur => ur.UserId == user.Id)
+                    .Select(ur => ur.Role.Name)
+                    .FirstOrDefaultAsync() ?? "User";
+
                 await SignInUser(user, role, true);
 
                 TempData["SuccessMessage"] = "Awatar został zaktualizowany.";

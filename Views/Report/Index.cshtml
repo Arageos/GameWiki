@@ -1,0 +1,46 @@
+﻿@{
+    ViewData["Title"] = "Panel raportów";
+}
+
+<div class="gw-auth-wrapper" style="align-items: flex-start; padding-top: 4rem;">
+    <div class="gw-auth-card" style="max-width: 540px;">
+        <div class="gw-auth-header">
+            <div class="gw-auth-icon">📊</div>
+            <h1 class="gw-auth-title">Raport aktywności</h1>
+            <p class="gw-auth-sub">Wygeneruj raport PDF dla wybranego okresu</p>
+        </div>
+
+        <!-- Skróty -->
+        <div class="d-flex gap-2 justify-content-center mb-4 flex-wrap">
+            <a href="@Url.Action("Generate", "Report", new { days = 7 })" class="gw-btn-outline" style="padding: 0.5rem 1.2rem; font-size: 0.9rem;">
+                Ostatnie 7 dni
+            </a>
+            <a href="@Url.Action("Generate", "Report", new { days = 30 })" class="gw-btn-primary" style="padding: 0.5rem 1.2rem; font-size: 0.9rem;">
+                Ostatnie 30 dni
+            </a>
+            <a href="@Url.Action("Generate", "Report", new { days = 90 })" class="gw-btn-outline" style="padding: 0.5rem 1.2rem; font-size: 0.9rem;">
+                Ostatnie 90 dni
+            </a>
+        </div>
+
+        <div style="border-top: 1px solid rgba(255,255,255,0.08); margin: 1.5rem 0; position: relative; text-align: center;">
+            <span style="background: rgba(30,35,50,0.9); padding: 0 1rem; color: #64748b; font-size: 0.85rem; position: relative; top: -0.6rem;">
+                lub wybierz własny zakres
+            </span>
+        </div>
+
+        <form asp-action="Generate" asp-controller="Report" method="get">
+            <div class="gw-form-group">
+                <label class="gw-label">Data od</label>
+                <input type="date" name="from" class="gw-input" value="@DateTime.Now.AddMonths(-1).ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="gw-form-group">
+                <label class="gw-label">Data do</label>
+                <input type="date" name="to" class="gw-input" value="@DateTime.Now.ToString("yyyy-MM-dd")" />
+            </div>
+            <button type="submit" class="gw-btn-primary gw-btn-full">
+                📄 Generuj PDF
+            </button>
+        </form>
+    </div>
+</div>
