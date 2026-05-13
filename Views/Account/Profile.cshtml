@@ -89,7 +89,7 @@
         <div class="col-md-8">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3 class="text-white fw-bold mb-0">Moje Artykuły 📝</h3>
-                <a asp-controller="Articles" asp-action="Create" class="gw-btn-primary" style="font-size: 0.85rem; padding: 0.5rem 1.2rem;">
+                <a asp-controller="Article" asp-action="Create" class="gw-btn-primary" style="font-size: 0.85rem; padding: 0.5rem 1.2rem;">
                     + Napisz artykuł
                 </a>
             </div>
@@ -108,7 +108,7 @@
                                     </a>
                                     <div class="mt-1" style="font-size: 0.8rem; color: #64748b;">
                                         🎮 @article.GameTitle &nbsp;·&nbsp;
-                                        📅 @((DateTime)article.CreatedAt).ToString("dd.MM.yyyy")
+                                        📅 @article.CreatedAt.ToString("dd.MM.yyyy")
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
@@ -124,7 +124,7 @@
                                             ⏳ Oczekuje
                                         </span>
                                     }
-                                    <a asp-controller="Articles" asp-action="Edit" asp-route-id="@article.Id"
+                                    <a asp-controller="Article" asp-action="Edit" asp-route-id="@article.Id"
                                        class="btn btn-sm btn-outline-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.6rem;">
                                         Edytuj
                                     </a>
@@ -138,7 +138,7 @@
             {
                 <div class="alert text-center" style="background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px dashed rgba(255,255,255,0.2);">
                     Nie napisałeś jeszcze żadnego artykułu.
-                    <a asp-controller="Articles" asp-action="Create" style="color: #a78bfa;">Napisz pierwszy!</a>
+                    <a asp-controller="Article" asp-action="Create" style="color: #a78bfa;">Napisz pierwszy!</a>
                 </div>
             }
         </div>
