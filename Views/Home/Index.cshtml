@@ -15,9 +15,12 @@
             <a asp-controller="Games" asp-action="Index" class="gw-btn-primary">
                 Przeglądaj gry
             </a>
-            <a asp-controller="Account" asp-action="Register" class="gw-btn-outline">
-                Dołącz do społeczności
+            @if (!User.Identity.IsAuthenticated)
+            {
+                <a asp-controller="Account" asp-action="Register" class="gw-btn-outline">
+                    Dołącz do społeczności
             </a>
+            }
         </div>
         <div class="gw-hero-stats">
             <div class="gw-stat">
