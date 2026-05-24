@@ -21,6 +21,17 @@ namespace GameWiki.Controllers
             ViewBag.GamesCount = await _context.Games.CountAsync();
             ViewBag.ArticlesCount = await _context.Articles.CountAsync();
             ViewBag.ReviewsCount = await _context.Reviews.CountAsync();
+
+            ViewBag.FeaturedGames = await _context.Games
+                .Where(g => g.BackgroundImage != null)
+                .OrderBy(_ => Guid.NewGuid()) 
+                .Take(6)
+                .Select(g => new { g.Id, g.Title, g.BackgroundImage })
+                .ToListAsync();
+            ViewBag.Genres = await _context.Genres
+                .OrderBy(g => g.Name)
+                .ToListAsync();
+
             return View();
         }
 

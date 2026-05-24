@@ -1,33 +1,34 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using GameWiki.DTOs.Game;
 using GameWiki.Models;
-using GameWiki.DTOs.Game;
+using GameWiki.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace GameWiki.Controllers
 {
     public class GamesController : Controller
     {
         private readonly GameWikiDbContext _context;
+        private readonly GameService _gameService;
 
-        public GamesController(GameWikiDbContext context)
+
+        public GamesController(GameWikiDbContext context, GameService gameService)
         {
             _context = context;
+            _gameService = gameService;
         }
 
-        
-        public async Task<IActionResult> Index()
+
+        public async Task<IActionResult> Index(string? search, int? genreId, int? platformId)
         {
-            var games = await _context.Games
-                .Select(g => new GameDto
-                {
-                    Id = g.Id,
-                    Title = g.Title,
-                    Description = g.Description,
-                    ReleaseDate = g.ReleaseDate,
-                    BackgroundImage = g.BackgroundImage
-                })
-                .ToListAsync();
+            var games = await _gameService.GetFilteredGamesAsync(search, genreId, platformId);
+
+            ViewBag.Genres = await _gameService.GetGenresAsync();
+            ViewBag.Platforms = await _gameService.GetPlatformsAsync();
+            ViewBag.Search = search;
+            ViewBag.GenreId = genreId;
+            ViewBag.PlatformId = platformId;
 
             return View(games);
         }

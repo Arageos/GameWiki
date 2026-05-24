@@ -23,6 +23,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 
 builder.Services.AddHttpClient<RawgService>();
+builder.Services.AddScoped<GameService>();
 
 var app = builder.Build();
 

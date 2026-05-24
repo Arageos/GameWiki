@@ -1,62 +1,205 @@
 ﻿@model IEnumerable<GameWiki.DTOs.Game.GameDto>
 @{
     ViewData["Title"] = "Games";
+    var genres = ViewBag.Genres as List<GameWiki.Models.Genre>;
+    var platforms = ViewBag.Platforms as List<GameWiki.Models.Platform>;
+    string search = ViewBag.Search ?? "";
+    int? genreId = ViewBag.GenreId;
+    int? platformId = ViewBag.PlatformId;
+    bool isFiltered = !string.IsNullOrEmpty(search) || genreId.HasValue || platformId.HasValue;
 }
 
 <div class="gw-section">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+
+   
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
         <div>
             <h1 class="gw-section-title">🎮 Games</h1>
-            <p class="gw-section-sub">Przeglądaj bazę gier</p>
+            <p class="gw-section-sub">
+                @if (isFiltered)
+                {
+                    <span>Wyniki filtrowania — <strong style="color:#a78bfa;">@Model.Count()</strong> gier</span>
+                }
+                else
+                {
+                    <span>Przeglądaj bazę gier</span>
+                }
+            </p>
         </div>
-        @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
-        {
-            <a asp-action="Create" class="gw-btn-primary">+ Dodaj grę</a>
-        }
+        <div style="display:flex; gap:0.8rem; align-items:center;">
+            <button class="gw-btn-outline" id="filterToggleBtn" onclick="toggleFilter()">
+                🔽 Filtruj
+                @if (isFiltered)
+                {
+                    <span class="gw-filter-active-dot"></span>
+                }
+            </button>
+            @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+            {
+                <a asp-action="Create" class="gw-btn-primary">+ Dodaj grę</a>
+            }
+        </div>
     </div>
 
-    <div class="gw-games-grid">
-        @foreach (var game in Model)
-        {
-            <div class="gw-game-card">
-                <a asp-action="Details" asp-route-id="@game.Id" class="gw-game-banner-link">
-                    @if (!string.IsNullOrEmpty(game.BackgroundImage))
-                    {
-                        <img src="@game.BackgroundImage" class="gw-game-banner" alt="@game.Title" />
-                    }
-                    else
-                    {
-                        <div class="gw-game-banner-placeholder">🎮</div>
-                    }
-            </a>
-            <div class="gw-game-info">
-                <a asp-action="Details" asp-route-id="@game.Id" class="gw-game-title">
-                    @game.Title
-                </a>
-                <span class="gw-game-date">@game.ReleaseDate.ToString("yyyy")</span>
-                <p class="gw-game-desc">
-                    @(game.Description.Length > 100
-                                        ? game.Description[..100] + "..."
-                                        : game.Description)
-                </p>
-                @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
-                    {
-                        <div class="gw-game-actions">
-                            <a asp-action="Details" asp-route-id="@game.Id" class="gw-action-link gw-action-details">Szczegóły</a>
-                            <span class="gw-action-sep">|</span>
-                            <a asp-action="Edit" asp-route-id="@game.Id" class="gw-action-link gw-action-edit">Edytuj</a>
-                            <span class="gw-action-sep">|</span>
-                            <a asp-action="Delete" asp-route-id="@game.Id" class="gw-action-link gw-action-delete">Usuń</a>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="gw-game-actions">
-                            <a asp-action="Details" asp-route-id="@game.Id" class="gw-action-link gw-action-details">Szczegóły</a>
-                        </div>
-                    }
+    
+    <div id="filterPanel" class="gw-filter-panel @(isFiltered ? "open" : "")">
+        <form asp-action="Index" method="get" id="filterForm">
+            <div class="gw-filter-grid">
+
+                <div class="gw-form-group" style="margin:0;">
+                    <label class="gw-label">Szukaj po tytule</label>
+                    <input type="text" name="search" value="@search"
+                           class="gw-input" placeholder="np. Wiedźmin..." />
+                </div>
+
+                <div class="gw-form-group" style="margin:0;">
+                    <label class="gw-label">Gatunek</label>
+                    <select name="genreId" class="gw-input gw-select">
+                        <option value="">— Wszystkie —</option>
+                        @foreach (var genre in genres!)
+                        {
+                            if (genreId == genre.Id)
+                            {
+                                <option value="@genre.Id" selected>@genre.Name</option>
+                            }
+                            else
+                            {
+                                <option value="@genre.Id">@genre.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="gw-form-group" style="margin:0;">
+                    <label class="gw-label">Platforma</label>
+                    <select name="platformId" class="gw-input gw-select">
+                        <option value="">— Wszystkie —</option>
+                        @foreach (var platform in platforms!)
+                        {
+                            if (platformId == platform.Id)
+                            {
+                                <option value="@platform.Id" selected>@platform.Name</option>
+                            }
+                            else
+                            {
+                                <option value="@platform.Id">@platform.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+
             </div>
-        </div>
+
+            <div style="display:flex; gap:0.8rem; margin-top:1.2rem;">
+                <button type="submit" class="gw-btn-primary" style="padding:0.6rem 1.4rem;">
+                    🔍 Szukaj
+                </button>
+                @if (isFiltered)
+                {
+                    <a asp-action="Index" class="gw-btn-outline" style="padding:0.6rem 1.4rem;">
+                        ✕ Wyczyść filtry
+                    </a>
                 }
+            </div>
+        </form>
     </div>
+
+    
+    @if (!Model.Any())
+    {
+        <div style="text-align:center; padding:4rem 0; color:#64748b;">
+            <div style="font-size:3rem; margin-bottom:1rem;">🔍</div>
+            <p style="font-size:1.1rem;">Nie znaleziono żadnych gier.</p>
+            <a asp-action="Index" class="gw-btn-outline" style="margin-top:1rem; display:inline-block;">
+                Wyczyść filtry
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="gw-games-grid">
+            @foreach (var game in Model)
+            {
+                <div class="gw-game-card">
+                    <a asp-action="Details" asp-route-id="@game.Id" class="gw-game-banner-link">
+                        @if (!string.IsNullOrEmpty(game.BackgroundImage))
+                        {
+                            <img src="@game.BackgroundImage" class="gw-game-banner" alt="@game.Title" />
+                        }
+                        else
+                        {
+                            <div class="gw-game-banner-placeholder">🎮</div>
+                        }
+                    </a>
+                    <div class="gw-game-info">
+                        <a asp-action="Details" asp-route-id="@game.Id" class="gw-game-title">
+                            @game.Title
+                        </a>
+                        <span class="gw-game-date">@game.ReleaseDate.ToString("yyyy")</span>
+                        <p class="gw-game-desc">
+                            @(game.Description.Length > 100
+                                ? game.Description[..100] + "..."
+                                : game.Description)
+                        </p>
+                        @if (game.LocalRating.HasValue)
+                        {
+                            <div style="display:flex; align-items:center; gap:0.4rem;">
+                                <div class="gw-stars-display">
+                                    @for (int i = 1; i <= 5; i++)
+                                    {
+                                        <span class="gw-star @(i <= Math.Round(game.LocalRating.Value) ? "filled" : "")">★</span>
+                                    }
+                                </div>
+                                <span style="font-size:0.78rem; color:#64748b;">(@game.LocalRatingsCount)</span>
+                            </div>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+                        {
+                            <div class="gw-game-actions">
+                                <a asp-action="Details" asp-route-id="@game.Id" class="gw-action-link gw-action-details">Szczegóły</a>
+                                <span class="gw-action-sep">|</span>
+                                <a asp-action="Edit" asp-route-id="@game.Id" class="gw-action-link gw-action-edit">Edytuj</a>
+                                <span class="gw-action-sep">|</span>
+                                <a asp-action="Delete" asp-route-id="@game.Id" class="gw-action-link gw-action-delete">Usuń</a>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="gw-game-actions">
+                                <a asp-action="Details" asp-route-id="@game.Id" class="gw-action-link gw-action-details">Szczegóły</a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
 </div>
+
+@section Scripts {
+    <script>
+        function toggleFilter() {
+            const panel = document.getElementById('filterPanel');
+            const btn = document.getElementById('filterToggleBtn');
+            const isOpen = panel.classList.toggle('open');
+            btn.textContent = isOpen ? '🔼 Filtruj' : '🔽 Filtruj';
+            // Przywróć kropkę jeśli są aktywne filtry
+            @if (isFiltered)
+            {
+                <text>
+                if (isOpen) btn.innerHTML += '<span class="gw-filter-active-dot"></span>';
+                </text>
+            }
+        }
+
+        // Otwórz panel automatycznie jeśli są aktywne filtry
+        document.addEventListener('DOMContentLoaded', () => {
+            @if (isFiltered)
+            {
+                <text>
+                document.getElementById('filterToggleBtn').innerHTML = '🔼 Filtruj <span class="gw-filter-active-dot"></span>';
+                </text>
+            }
+        });
+    </script>
+}

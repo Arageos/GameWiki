@@ -1,8 +1,35 @@
-﻿@{
+﻿@using GameWiki.Models
+@{
     ViewData["Title"] = "Strona główna";
+    var featuredGames = ViewBag.FeaturedGames as IEnumerable<dynamic>;
+    var genres = ViewBag.Genres as List<Genre>;
+
+    var genreIcons = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Action"] = "⚔️",
+        ["RPG"] = "🧙",
+        ["Shooter"] = "🔫",
+        ["Sport"] = "⚽",
+        ["Puzzle"] = "🧩",
+        ["Racing"] = "🏎️",
+        ["Horror"] = "👻",
+        ["Adventure"] = "🗺️",
+        ["Strategy"] = "♟️",
+        ["Simulation"] = "🏗️",
+        ["Fighting"] = "🥊",
+        ["Platformer"] = "🕹️",
+        ["Indie"] = "🎨",
+        ["Arcade"] = "👾",
+        ["Card"] = "🃏",
+        ["Casual"] = "🎪",
+        ["Family"] = "👨‍👩‍👧",
+        ["Massively Multiplayer"] = "🌐",
+        ["Educational"] = "📚",
+        ["Sports"] = "🏆",
+    };
 }
 
-<!-- HERO SECTION -->
+<!-- HERO -->
 <div class="gw-hero">
     <div class="gw-hero-content">
         <div class="gw-hero-badge">🎮 Encyklopedia Gier</div>
@@ -19,7 +46,7 @@
             {
                 <a asp-controller="Account" asp-action="Register" class="gw-btn-outline">
                     Dołącz do społeczności
-            </a>
+                </a>
             }
         </div>
         <div class="gw-hero-stats">
@@ -39,74 +66,55 @@
             </div>
         </div>
     </div>
+
+    <!-- MOZAIKA OKŁADEK -->
     <div class="gw-hero-visual">
-        <div class="gw-hero-card gw-card-1">
-            <div class="gw-hcard-icon">⚔️</div>
-            <div class="gw-hcard-title">RPG</div>
-            <div class="gw-hcard-sub">Otwarte światy</div>
+        <div class="gw-mosaic">
+            @if (featuredGames != null)
+            {
+                int i = 0;
+                foreach (var game in featuredGames)
+                {
+                    <a asp-controller="Games" asp-action="Details" asp-route-id="@game.Id"
+                       class="gw-mosaic-item gw-mosaic-@(i % 6)"
+                       title="@game.Title">
+                        <img src="@game.BackgroundImage" alt="@game.Title" />
+                        <div class="gw-mosaic-overlay">
+                            <span>@game.Title</span>
+                        </div>
+                    </a>
+                    i++;
+                }
+            }
         </div>
-        <div class="gw-hero-card gw-card-2">
-            <div class="gw-hcard-icon">🏎️</div>
-            <div class="gw-hcard-title">Racing</div>
-            <div class="gw-hcard-sub">Wyścigi</div>
-        </div>
-        <div class="gw-hero-card gw-card-3">
-            <div class="gw-hcard-icon">🔫</div>
-            <div class="gw-hcard-title">Shooter</div>
-            <div class="gw-hcard-sub">FPS & TPS</div>
-        </div>
-        <div class="gw-hero-card gw-card-4">
-            <div class="gw-hcard-icon">🧩</div>
-            <div class="gw-hcard-title">Puzzle</div>
-            <div class="gw-hcard-sub">Łamigłówki</div>
-        </div>
-        <div class="gw-hero-orb"></div>
+        <div class="gw-mosaic-fade-left"></div>
     </div>
 </div>
 
-<!-- SEKCJA: PRZEGLĄDAJ WEDŁUG GATUNKU -->
+<!-- GATUNKI -->
 <section class="gw-section">
     <div class="gw-section-header">
         <h2 class="gw-section-title">Przeglądaj według gatunku</h2>
         <p class="gw-section-sub">Znajdź gry dopasowane do swoich upodobań</p>
     </div>
     <div class="gw-genres-grid">
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">⚔️</span>
-            <span class="gw-genre-name">RPG</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">🔫</span>
-            <span class="gw-genre-name">Shooter</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">⚽</span>
-            <span class="gw-genre-name">Sport</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">🧩</span>
-            <span class="gw-genre-name">Puzzle</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">🏎️</span>
-            <span class="gw-genre-name">Racing</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">👻</span>
-            <span class="gw-genre-name">Horror</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">🛸</span>
-            <span class="gw-genre-name">Sci-Fi</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">🗺️</span>
-            <span class="gw-genre-name">Adventure</span>
-        </a>
+        @if (genres != null && genres.Any())
+        {
+            foreach (var genre in genres)
+            {
+                var icon = genreIcons.ContainsKey(genre.Name) ? genreIcons[genre.Name] : "🎮";
+                <a asp-controller="Games" asp-action="Index"
+                   asp-route-genreId="@genre.Id"
+                   class="gw-genre-card">
+                    <span class="gw-genre-icon">@icon</span>
+                    <span class="gw-genre-name">@genre.Name</span>
+                </a>
+            }
+        }
     </div>
 </section>
 
-<!-- SEKCJA: DLACZEGO GAMEWIKI -->
+<!-- FEATURES -->
 <section class="gw-section gw-features-section">
     <div class="gw-section-header">
         <h2 class="gw-section-title">Dlaczego GameWiki?</h2>
@@ -136,21 +144,19 @@
     </div>
 </section>
 
-<!-- SEKCJA: CTA -->
-<section class="gw-cta-section">
-    <div class="gw-cta-content">
-        @if (!User.Identity.IsAuthenticated)
-        {
-            <h2 class="gw-cta-title">Gotowy, żeby zacząć?</h2>
-            <p class="gw-cta-sub">Dołącz do społeczności graczy. Rejestracja jest bezpłatna.</p>
-            <div class="gw-cta-actions">
-                <a asp-controller="Account" asp-action="Register" class="gw-btn-primary">
-                    Zarejestruj się za darmo
-                </a>
-                <a asp-controller="Account" asp-action="Login" class="gw-btn-ghost">
-                    Zaloguj się
-                </a>
-            </div>
-        }
-    </div>
-</section>
+<!-- CTA -->
+@if (!User.Identity.IsAuthenticated)
+{
+    <section class="gw-cta-section">
+        <h2 class="gw-cta-title">Gotowy, żeby zacząć?</h2>
+        <p class="gw-cta-sub">Dołącz do społeczności graczy. Rejestracja jest bezpłatna.</p>
+        <div class="gw-cta-actions">
+            <a asp-controller="Account" asp-action="Register" class="gw-btn-primary">
+                Zarejestruj się za darmo
+            </a>
+            <a asp-controller="Account" asp-action="Login" class="gw-btn-ghost">
+                Zaloguj się
+            </a>
+        </div>
+    </section>
+}
