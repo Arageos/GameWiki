@@ -1,34 +1,4 @@
-﻿====== appsettings.Development.json ======
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  }
-}
-
-====== appsettings.json ======
-{
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=GameWikiDb;Trusted_Connection=True;"
-  },
-
-  "Rawg": {
-    "ApiKey": "6b97822e12ec4f04912b153f009b47d2"
-  },
-
-  "AllowedHosts": "*"
-}
-
-====== Program.cs ======
+﻿====== Program.cs ======
 using GameWiki.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +24,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 
 builder.Services.AddHttpClient<RawgService>();
+builder.Services.AddScoped<GameService>();
 
 var app = builder.Build();
 
@@ -531,6 +502,94 @@ namespace GameWiki.Controllers
                 .ToListAsync();
 
             return View(articles);
+        }
+        // --- PANEL ZGŁOSZEŃ ---
+        public async Task<IActionResult> Reports()
+        {
+            var reports = await _context.Reports
+                .Include(r => r.Reporter)
+                .Where(r => r.Status == ReportStatus.Pending)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync();
+
+            var reportDtos = new List<GameWiki.DTOs.Admin.ReportItemDto>();
+
+            foreach (var r in reports)
+            {
+                var dto = new GameWiki.DTOs.Admin.ReportItemDto
+                {
+                    ReportId = r.Id,
+                    ReporterName = r.Reporter.Username,
+                    Type = r.Type,
+                    TargetId = r.TargetId,
+                    Reason = r.Reason,
+                    CreatedAt = r.CreatedAt
+                };
+
+                // Dociągamy treść w zależności od tego, co zgłoszono
+                if (r.Type == ReportType.Comment)
+                {
+                    var comment = await _context.Comments.Include(c => c.User).FirstOrDefaultAsync(c => c.Id == r.TargetId);
+                    dto.ContentText = comment != null ? comment.Content : "[Treść została usunięta]";
+                    dto.ContentAuthorName = comment?.User?.Username ?? "Nieznany";
+                }
+                else if (r.Type == ReportType.Review)
+                {
+                    var review = await _context.Reviews.Include(rev => rev.User).FirstOrDefaultAsync(rev => rev.Id == r.TargetId);
+                    dto.ContentText = review != null ? review.Content : "[Treść została usunięta]";
+                    dto.ContentAuthorName = review?.User?.Username ?? "Nieznany";
+                }
+
+                reportDtos.Add(dto);
+            }
+
+            return View(reportDtos);
+        }
+
+        // --- ROZPATRYWANIE ZGŁOSZEŃ ---
+        [HttpPost]
+        public async Task<IActionResult> HandleReport(int reportId, string actionType)
+        {
+            var report = await _context.Reports.FindAsync(reportId);
+            if (report == null) return NotFound();
+
+            if (actionType == "delete")
+            {
+                // Usuwamy złą treść
+                if (report.Type == ReportType.Comment)
+                {
+                    var comment = await _context.Comments.FindAsync(report.TargetId);
+                    if (comment != null)
+                    {
+                        // 1. Najpierw znajdujemy i usuwamy wszystkie odpowiedzi do tego komentarza
+                        var replies = await _context.Comments.Where(c => c.ParentCommentId == comment.Id).ToListAsync();
+                        if (replies.Any())
+                        {
+                            _context.Comments.RemoveRange(replies);
+                        }
+
+                        // 2. Dopiero potem usuwamy główny komentarz
+                        _context.Comments.Remove(comment);
+                    }
+                }
+                else if (report.Type == ReportType.Review)
+                {
+                    var review = await _context.Reviews.FindAsync(report.TargetId);
+                    if (review != null) _context.Reviews.Remove(review);
+                }
+
+                TempData["SuccessMessage"] = "Treść została pomyślnie usunięta, a zgłoszenie zamknięte.";
+            }
+            else if (actionType == "dismiss")
+            {
+                TempData["SuccessMessage"] = "Zgłoszenie zostało odrzucone.";
+            }
+
+            // Oznaczamy zgłoszenie jako załatwione
+            report.Status = ReportStatus.Resolved;
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Reports));
         }
     }
 }
@@ -1049,36 +1108,37 @@ namespace GameWiki.Controllers
 }
 
 ====== GamesController.cs ======
+using GameWiki.DTOs.Game;
+using GameWiki.Models;
+using GameWiki.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using GameWiki.Models;
-using GameWiki.DTOs.Game;
-using Microsoft.AspNetCore.Authorization;
 
 namespace GameWiki.Controllers
 {
     public class GamesController : Controller
     {
         private readonly GameWikiDbContext _context;
+        private readonly GameService _gameService;
 
-        public GamesController(GameWikiDbContext context)
+
+        public GamesController(GameWikiDbContext context, GameService gameService)
         {
             _context = context;
+            _gameService = gameService;
         }
 
-        
-        public async Task<IActionResult> Index()
+
+        public async Task<IActionResult> Index(string? search, int? genreId, int? platformId)
         {
-            var games = await _context.Games
-                .Select(g => new GameDto
-                {
-                    Id = g.Id,
-                    Title = g.Title,
-                    Description = g.Description,
-                    ReleaseDate = g.ReleaseDate,
-                    BackgroundImage = g.BackgroundImage
-                })
-                .ToListAsync();
+            var games = await _gameService.GetFilteredGamesAsync(search, genreId, platformId);
+
+            ViewBag.Genres = await _gameService.GetGenresAsync();
+            ViewBag.Platforms = await _gameService.GetPlatformsAsync();
+            ViewBag.Search = search;
+            ViewBag.GenreId = genreId;
+            ViewBag.PlatformId = platformId;
 
             return View(games);
         }
@@ -1350,6 +1410,17 @@ namespace GameWiki.Controllers
             ViewBag.GamesCount = await _context.Games.CountAsync();
             ViewBag.ArticlesCount = await _context.Articles.CountAsync();
             ViewBag.ReviewsCount = await _context.Reviews.CountAsync();
+
+            ViewBag.FeaturedGames = await _context.Games
+                .Where(g => g.BackgroundImage != null)
+                .OrderBy(_ => Guid.NewGuid()) 
+                .Take(6)
+                .Select(g => new { g.Id, g.Title, g.BackgroundImage })
+                .ToListAsync();
+            ViewBag.Genres = await _context.Genres
+                .OrderBy(g => g.Name)
+                .ToListAsync();
+
             return View();
         }
 
@@ -1627,6 +1698,62 @@ namespace GameWiki.Controllers
     }
 }
 
+====== ReportsController.cs ======
+using GameWiki.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+
+namespace GameWiki.Controllers
+{
+    [Authorize] // Tylko zalogowani mogą zgłaszać
+    public class ReportsController : Controller
+    {
+        private readonly GameWikiDbContext _context;
+
+        public ReportsController(GameWikiDbContext context)
+        {
+            _context = context;
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Create(ReportType type, int targetId, string reason, string returnUrl)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                TempData["ErrorMessage"] = "Musisz podać powód zgłoszenia.";
+                return Redirect(returnUrl ?? "/");
+            }
+
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdStr, out int userId)) return RedirectToAction("Login", "Account");
+
+            // 1. Zapisujemy zgłoszenie
+            var report = new Report
+            {
+                ReporterId = userId,
+                Type = type,
+                TargetId = targetId,
+                Reason = reason
+            };
+            _context.Reports.Add(report);
+
+            // 2. Tworzymy powiadomienie "Dzwoneczek" dla administracji
+            var notification = new ModNotification
+            {
+                Message = $"Nowe zgłoszenie ({type}) od użytkownika {User.Identity?.Name}.",
+                ActionUrl = "/Admin/Reports" // Ten widok stworzymy w Etapie 4
+            };
+            _context.ModNotifications.Add(notification);
+
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "Zgłoszenie zostało wysłane do administracji. Dziękujemy za reakcję!";
+            return Redirect(returnUrl ?? "/");
+        }
+    }
+}
+
 ====== ReviewsController.cs ======
 using GameWiki.DTOs.Review;
 using GameWiki.Models;
@@ -1849,6 +1976,8 @@ public class GameWikiDbContext : DbContext
     public DbSet<FavoriteGame> FavoriteGames { get; set; }
 
     public DbSet<Image> Images { get; set; }
+    public DbSet<Report> Reports { get; set; }
+    public DbSet<ModNotification> ModNotifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1971,6 +2100,24 @@ public class GameWikiDbContext : DbContext
             .WithMany()
             .HasForeignKey(i => i.ArticleBlockId)
             .OnDelete(DeleteBehavior.NoAction);
+    }
+}
+
+====== ReportItemDto.cs ======
+namespace GameWiki.DTOs.Admin
+{
+    public class ReportItemDto
+    {
+        public int ReportId { get; set; }
+        public string ReporterName { get; set; }
+        public GameWiki.Models.ReportType Type { get; set; }
+        public int TargetId { get; set; }
+        public string Reason { get; set; }
+        public DateTime CreatedAt { get; set; }
+
+        // Pola specyficzne dla recenzji i komentarzy
+        public string ContentAuthorName { get; set; }
+        public string ContentText { get; set; }
     }
 }
 
@@ -3415,12 +3562,107 @@ namespace GameWiki.Migrations
     }
 }
 
-====== GameWikiDbContextModelSnapshot.cs ======
+====== 20260512185052_TicketAndVerification.cs ======
+using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace GameWiki.Migrations
+{
+    /// <inheritdoc />
+    public partial class TicketAndVerification : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.AddColumn<bool>(
+                name: "IsVerified",
+                table: "Reviews",
+                type: "bit",
+                nullable: false,
+                defaultValue: false);
+
+            migrationBuilder.AddColumn<bool>(
+                name: "IsVerified",
+                table: "Comments",
+                type: "bit",
+                nullable: false,
+                defaultValue: false);
+
+            migrationBuilder.CreateTable(
+                name: "ModNotifications",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Message = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ActionUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    IsResolved = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ModNotifications", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Reports",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ReporterId = table.Column<int>(type: "int", nullable: false),
+                    Type = table.Column<int>(type: "int", nullable: false),
+                    TargetId = table.Column<int>(type: "int", nullable: false),
+                    Reason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Reports", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Reports_Users_ReporterId",
+                        column: x => x.ReporterId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Reports_ReporterId",
+                table: "Reports",
+                column: "ReporterId");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: "ModNotifications");
+
+            migrationBuilder.DropTable(
+                name: "Reports");
+
+            migrationBuilder.DropColumn(
+                name: "IsVerified",
+                table: "Reviews");
+
+            migrationBuilder.DropColumn(
+                name: "IsVerified",
+                table: "Comments");
+        }
+    }
+}
+
+====== 20260512185052_TicketAndVerification.Designer.cs ======
 // <auto-generated />
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -3428,9 +3670,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GameWiki.Migrations
 {
     [DbContext(typeof(GameWikiDbContext))]
-    partial class GameWikiDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260512185052_TicketAndVerification")]
+    partial class TicketAndVerification
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3524,6 +3768,9 @@ namespace GameWiki.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
 
                     b.Property<int?>("ParentCommentId")
                         .HasColumnType("int");
@@ -3717,6 +3964,33 @@ namespace GameWiki.Migrations
                     b.ToTable("Images");
                 });
 
+            modelBuilder.Entity("GameWiki.Models.ModNotification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ActionUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ModNotifications");
+                });
+
             modelBuilder.Entity("GameWiki.Models.Platform", b =>
                 {
                     b.Property<int>("Id")
@@ -3733,6 +4007,41 @@ namespace GameWiki.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Platforms");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Report", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ReporterId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReporterId");
+
+                    b.ToTable("Reports");
                 });
 
             modelBuilder.Entity("GameWiki.Models.Review", b =>
@@ -3752,6 +4061,9 @@ namespace GameWiki.Migrations
 
                     b.Property<int>("GameId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
 
                     b.Property<int>("Rating")
                         .HasColumnType("int");
@@ -3992,6 +4304,758 @@ namespace GameWiki.Migrations
                         .OnDelete(DeleteBehavior.NoAction);
                 });
 
+            modelBuilder.Entity("GameWiki.Models.Report", b =>
+                {
+                    b.HasOne("GameWiki.Models.User", "Reporter")
+                        .WithMany()
+                        .HasForeignKey("ReporterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Reporter");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Review", b =>
+                {
+                    b.HasOne("GameWiki.Models.Game", "Game")
+                        .WithMany("Reviews")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameWiki.Models.User", "User")
+                        .WithMany("Reviews")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Game");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.UserRole", b =>
+                {
+                    b.HasOne("GameWiki.Models.Role", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameWiki.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Article", b =>
+                {
+                    b.Navigation("Blocks");
+
+                    b.Navigation("Comments");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Comment", b =>
+                {
+                    b.Navigation("Reactions");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.FavoriteList", b =>
+                {
+                    b.Navigation("FavoriteGames");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Game", b =>
+                {
+                    b.Navigation("GameGenres");
+
+                    b.Navigation("GamePlatforms");
+
+                    b.Navigation("Reviews");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Genre", b =>
+                {
+                    b.Navigation("GameGenres");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Platform", b =>
+                {
+                    b.Navigation("GamePlatforms");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.User", b =>
+                {
+                    b.Navigation("FavoriteLists");
+
+                    b.Navigation("Reviews");
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
+
+====== GameWikiDbContextModelSnapshot.cs ======
+// <auto-generated />
+using System;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+#nullable disable
+
+namespace GameWiki.Migrations
+{
+    [DbContext(typeof(GameWikiDbContext))]
+    partial class GameWikiDbContextModelSnapshot : ModelSnapshot
+    {
+        protected override void BuildModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasAnnotation("ProductVersion", "9.0.14")
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("GameWiki.Models.Article", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuthorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CoverImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("GameId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.HasIndex("GameId");
+
+                    b.ToTable("Articles");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.ArticleBlock", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ArticleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArticleId");
+
+                    b.ToTable("ArticleBlocks");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Comment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ArticleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("ParentCommentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArticleId");
+
+                    b.HasIndex("ParentCommentId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Comments");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.CommentReaction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CommentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("CommentId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("CommentReactions");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.FavoriteGame", b =>
+                {
+                    b.Property<int>("FavoriteListId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("GameId")
+                        .HasColumnType("int");
+
+                    b.HasKey("FavoriteListId", "GameId");
+
+                    b.HasIndex("GameId");
+
+                    b.ToTable("FavoriteGames");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.FavoriteList", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("FavoriteLists");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Game", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BackgroundImage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<double?>("RawgRating")
+                        .HasColumnType("float");
+
+                    b.Property<int?>("RawgRatingsCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ReleaseDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Games");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.GameGenre", b =>
+                {
+                    b.Property<int>("GameId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("GenreId")
+                        .HasColumnType("int");
+
+                    b.HasKey("GameId", "GenreId");
+
+                    b.HasIndex("GenreId");
+
+                    b.ToTable("GameGenres");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.GamePlatform", b =>
+                {
+                    b.Property<int>("GameId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PlatformId")
+                        .HasColumnType("int");
+
+                    b.HasKey("GameId", "PlatformId");
+
+                    b.HasIndex("PlatformId");
+
+                    b.ToTable("GamePlatforms");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Genre", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Genres");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Image", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("ArticleBlockId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("GameId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArticleBlockId");
+
+                    b.HasIndex("GameId");
+
+                    b.ToTable("Images");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.ModNotification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ActionUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ModNotifications");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Platform", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Platforms");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Report", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ReporterId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReporterId");
+
+                    b.ToTable("Reports");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Review", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("GameId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GameId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Reviews");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Role", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Roles");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.User", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsBanned")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProfilePictureUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.UserRole", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("UserId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("UserRoles");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Article", b =>
+                {
+                    b.HasOne("GameWiki.Models.User", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GameWiki.Models.Game", "Game")
+                        .WithMany()
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Author");
+
+                    b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.ArticleBlock", b =>
+                {
+                    b.HasOne("GameWiki.Models.Article", "Article")
+                        .WithMany("Blocks")
+                        .HasForeignKey("ArticleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Article");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Comment", b =>
+                {
+                    b.HasOne("GameWiki.Models.Article", "Article")
+                        .WithMany("Comments")
+                        .HasForeignKey("ArticleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameWiki.Models.Comment", "ParentComment")
+                        .WithMany()
+                        .HasForeignKey("ParentCommentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("GameWiki.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Article");
+
+                    b.Navigation("ParentComment");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.CommentReaction", b =>
+                {
+                    b.HasOne("GameWiki.Models.Comment", "Comment")
+                        .WithMany("Reactions")
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameWiki.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Comment");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.FavoriteGame", b =>
+                {
+                    b.HasOne("GameWiki.Models.FavoriteList", "FavoriteList")
+                        .WithMany("FavoriteGames")
+                        .HasForeignKey("FavoriteListId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameWiki.Models.Game", "Game")
+                        .WithMany()
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FavoriteList");
+
+                    b.Navigation("Game");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.FavoriteList", b =>
+                {
+                    b.HasOne("GameWiki.Models.User", "User")
+                        .WithMany("FavoriteLists")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.GameGenre", b =>
+                {
+                    b.HasOne("GameWiki.Models.Game", "Game")
+                        .WithMany("GameGenres")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameWiki.Models.Genre", "Genre")
+                        .WithMany("GameGenres")
+                        .HasForeignKey("GenreId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Game");
+
+                    b.Navigation("Genre");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.GamePlatform", b =>
+                {
+                    b.HasOne("GameWiki.Models.Game", "Game")
+                        .WithMany("GamePlatforms")
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GameWiki.Models.Platform", "Platform")
+                        .WithMany("GamePlatforms")
+                        .HasForeignKey("PlatformId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Game");
+
+                    b.Navigation("Platform");
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Image", b =>
+                {
+                    b.HasOne("GameWiki.Models.ArticleBlock", null)
+                        .WithMany()
+                        .HasForeignKey("ArticleBlockId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("GameWiki.Models.Game", null)
+                        .WithMany()
+                        .HasForeignKey("GameId")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("GameWiki.Models.Report", b =>
+                {
+                    b.HasOne("GameWiki.Models.User", "Reporter")
+                        .WithMany()
+                        .HasForeignKey("ReporterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Reporter");
+                });
+
             modelBuilder.Entity("GameWiki.Models.Review", b =>
                 {
                     b.HasOne("GameWiki.Models.Game", "Game")
@@ -4157,6 +5221,7 @@ namespace GameWiki.Models
         public Comment ParentComment { get; set; }
 
         public ICollection<CommentReaction> Reactions { get; set; }
+        public bool IsVerified { get; set; } = false;
     }
 }
 
@@ -4312,6 +5377,19 @@ namespace GameWiki.Models
     }
 }
 
+====== ModNotification.cs ======
+namespace GameWiki.Models
+{
+    public class ModNotification
+    {
+        public int Id { get; set; }
+        public string Message { get; set; } // np. "Użytkownik X dodał nowy artykuł"
+        public string ActionUrl { get; set; } // Link do sprawdzenia treści/zgłoszenia
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public bool IsResolved { get; set; } = false; // Czy ktoś już się tym zajął
+    }
+}
+
 ====== Platform.cs ======
 using System.ComponentModel.DataAnnotations;
 
@@ -4326,6 +5404,36 @@ namespace GameWiki.Models
         public string Name { get; set; }
 
         public ICollection<GamePlatform> GamePlatforms { get; set; }
+    }
+}
+
+====== Report.cs ======
+using System.ComponentModel.DataAnnotations;
+
+namespace GameWiki.Models
+{
+    public enum ReportType { User, Article, Review, Comment }
+    public enum ReportStatus { Pending, Resolved, Dismissed }
+
+    public class Report
+    {
+        public int Id { get; set; }
+
+        public int ReporterId { get; set; }
+        public User Reporter { get; set; }
+
+        public ReportType Type { get; set; }
+
+        // Przechowuje ID zgłaszanego elementu (ID artykułu, komentarza, recenzji lub użytkownika)
+        public int TargetId { get; set; }
+
+        [Required]
+        [MaxLength(500)]
+        public string Reason { get; set; }
+
+        public ReportStatus Status { get; set; } = ReportStatus.Pending;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }
 
@@ -4346,6 +5454,7 @@ namespace GameWiki.Models
         [MaxLength(2000)]
         public string? Content { get; set; }
         public DateTime CreatedAt { get; set; }
+        public bool IsVerified { get; set; } = false;
     }
 }
 
@@ -4403,29 +5512,61 @@ namespace GameWiki.Models
     }
 }
 
-====== launchSettings.json ======
+====== GameService.cs ======
+using GameWiki.DTOs.Game;
+using GameWiki.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace GameWiki.Services
 {
-  "$schema": "https://json.schemastore.org/launchsettings.json",
-  "profiles": {
-    "http": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "applicationUrl": "http://localhost:5210",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
-    "https": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "applicationUrl": "https://localhost:7233;http://localhost:5210",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
+    public class GameService
+    {
+        private readonly GameWikiDbContext _context;
+
+        public GameService(GameWikiDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<List<GameDto>> GetFilteredGamesAsync(string? search, int? genreId, int? platformId)
+        {
+            var query = _context.Games.AsQueryable();
+
+            if (!string.IsNullOrEmpty(search))
+                query = query.Where(g => g.Title.Contains(search));
+
+            if (genreId.HasValue)
+                query = query.Where(g => g.GameGenres.Any(gg => gg.GenreId == genreId));
+
+            if (platformId.HasValue)
+                query = query.Where(g => g.GamePlatforms.Any(gp => gp.PlatformId == platformId));
+
+            return await query
+                .Select(g => new GameDto
+                {
+                    Id = g.Id,
+                    Title = g.Title,
+                    Description = g.Description,
+                    ReleaseDate = g.ReleaseDate,
+                    BackgroundImage = g.BackgroundImage,
+                    RawgRating = g.RawgRating,
+                    RawgRatingsCount = g.RawgRatingsCount,
+                    LocalRating = g.Reviews.Any()
+                        ? Math.Round(g.Reviews.Average(r => r.Rating), 1)
+                        : null,
+                    LocalRatingsCount = g.Reviews.Count()
+                })
+                .ToListAsync();
+        }
+
+        public async Task<List<Genre>> GetGenresAsync()
+            => await _context.Genres.OrderBy(g => g.Name).ToListAsync();
+
+        public async Task<List<Platform>> GetPlatformsAsync()
+            => await _context.Platforms.OrderBy(p => p.Name).ToListAsync();
+
+        
     }
-  }
 }
 
 ====== RawgService.cs ======
@@ -4688,7 +5829,7 @@ namespace GameWiki.Services
         <div class="col-md-8">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h3 class="text-white fw-bold mb-0">Moje Artykuły 📝</h3>
-                <a asp-controller="Articles" asp-action="Create" class="gw-btn-primary" style="font-size: 0.85rem; padding: 0.5rem 1.2rem;">
+                <a asp-controller="Article" asp-action="Create" class="gw-btn-primary" style="font-size: 0.85rem; padding: 0.5rem 1.2rem;">
                     + Napisz artykuł
                 </a>
             </div>
@@ -4707,7 +5848,7 @@ namespace GameWiki.Services
                                     </a>
                                     <div class="mt-1" style="font-size: 0.8rem; color: #64748b;">
                                         🎮 @article.GameTitle &nbsp;·&nbsp;
-                                        📅 @((DateTime)article.CreatedAt).ToString("dd.MM.yyyy")
+                                        📅 @article.CreatedAt.ToString("dd.MM.yyyy")
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
@@ -4723,7 +5864,7 @@ namespace GameWiki.Services
                                             ⏳ Oczekuje
                                         </span>
                                     }
-                                    <a asp-controller="Articles" asp-action="Edit" asp-route-id="@article.Id"
+                                    <a asp-controller="Article" asp-action="Edit" asp-route-id="@article.Id"
                                        class="btn btn-sm btn-outline-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.6rem;">
                                         Edytuj
                                     </a>
@@ -4737,7 +5878,7 @@ namespace GameWiki.Services
             {
                 <div class="alert text-center" style="background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px dashed rgba(255,255,255,0.2);">
                     Nie napisałeś jeszcze żadnego artykułu.
-                    <a asp-controller="Articles" asp-action="Create" style="color: #a78bfa;">Napisz pierwszy!</a>
+                    <a asp-controller="Article" asp-action="Create" style="color: #a78bfa;">Napisz pierwszy!</a>
                 </div>
             }
         </div>
@@ -5179,7 +6320,7 @@ namespace GameWiki.Views.Admin
                     @* Akcje *@
                     <div style="display:flex; flex-direction:column; gap:0.5rem; flex-shrink:0;">
                         <a asp-controller="Article" asp-action="Details" asp-route-id="@article.Id"
-                           class="btn btn-sm btn-outline-secondary" target="_blank">
+                           class="btn btn-sm btn-outline-secondary">
                             👁️ Podgląd
                         </a>
                         <form asp-controller="Article" asp-action="Verify" asp-route-id="@article.Id"
@@ -5193,6 +6334,93 @@ namespace GameWiki.Views.Admin
                             @Html.AntiForgeryToken()
                             <button type="submit" class="btn btn-sm btn-outline-danger w-100">❌ Odrzuć</button>
                         </form>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+====== Reports.cshtml ======
+@model IEnumerable<GameWiki.DTOs.Admin.ReportItemDto>
+@{
+    ViewData["Title"] = "Zgłoszenia Użytkowników";
+}
+
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-white fw-bold">Zgłoszone treści 🚩</h2>
+        <a asp-action="Index" class="btn btn-outline-light">Wróć do Panelu Administracyjnego</a>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="alert text-center" style="background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px dashed rgba(255,255,255,0.2);">
+            Hurra! Brak oczekujących zgłoszeń. Społeczność zachowuje się wzorowo.
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var report in Model)
+            {
+                <div class="col-12 mb-4">
+                    <div class="gw-card p-4" style="background: #1a1d26; border-radius: 12px; border-left: 4px solid #f59e0b;">
+
+                        <div class="d-flex justify-content-between mb-3 border-bottom border-secondary pb-2">
+                            <div>
+                                <span class="badge bg-warning text-dark me-2 text-uppercase">@report.Type.ToString()</span>
+                                <span class="text-muted small">
+                                    Zgłoszone przez: <strong class="text-light">@report.ReporterName</strong>
+                                    &nbsp;·&nbsp; @report.CreatedAt.ToString("dd.MM.yyyy HH:mm")
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <span class="text-uppercase small fw-bold" style="color: #94a3b8;">Powód zgłoszenia:</span>
+                            <p class="text-white fst-italic mt-1">"@report.Reason"</p>
+                        </div>
+
+                        @if (report.Type == GameWiki.Models.ReportType.Comment || report.Type == GameWiki.Models.ReportType.Review)
+                        {
+                            <div class="p-3 mb-4 rounded" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05);">
+                                <span class="text-muted small">
+                                    Autor zablokowanej treści: <strong class="text-info">@report.ContentAuthorName</strong>
+                                </span>
+                                <p class="text-light mt-2 mb-0">@report.ContentText</p>
+                            </div>
+                        }
+
+                        <div class="d-flex gap-2">
+                            @if (report.Type == GameWiki.Models.ReportType.Article)
+                            {
+                                <a href="/Article/Details/@report.TargetId" class="btn btn-primary btn-sm">Przejdź do artykułu</a>
+                            }
+
+                            <form asp-action="HandleReport" method="post" class="m-0">
+                                <input type="hidden" name="reportId" value="@report.ReportId" />
+                                <input type="hidden" name="actionType" value="dismiss" />
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">Zignoruj zgłoszenie</button>
+                            </form>
+
+                            @if (report.Type == GameWiki.Models.ReportType.Comment || report.Type == GameWiki.Models.ReportType.Review)
+                            {
+                                <form asp-action="HandleReport" method="post" class="m-0">
+                                    <input type="hidden" name="reportId" value="@report.ReportId" />
+                                    <input type="hidden" name="actionType" value="delete" />
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Na pewno usunąć tę treść? To działanie jest nieodwracalne.');">Usuń treść</button>
+                                </form>
+                            }
+                        </div>
                     </div>
                 </div>
             }
@@ -5418,7 +6646,7 @@ namespace GameWiki.Views.Admin
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
-
+    
     @* ── TREŚĆ ARTYKUŁU ── *@
     <div style="max-width:780px; margin:2rem auto 0;">
         @foreach (var block in Model.Blocks)
@@ -5448,6 +6676,16 @@ namespace GameWiki.Views.Admin
                 </form>
             }
             <a asp-action="Index" asp-route-gameId="@Model.GameId" class="gw-btn-outline">← Wróć</a>
+            @if (User.Identity?.IsAuthenticated == true && Model.AuthorId.ToString() != User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)
+            {
+                <button type="button" class="btn btn-sm btn-outline-warning ms-3 rounded-pill"
+                        data-bs-toggle="modal"
+                        data-bs-target="#reportModal"
+                        data-report-type="Article"
+                        data-report-targetid="@Model.Id">
+                    🚩 Zgłoś artykuł
+                </button>
+            }
         </div>
 
         @* ── SEKCJA KOMENTARZY ── *@
@@ -5917,6 +7155,17 @@ namespace GameWiki.Views.Admin
                         💬 Odpowiedz
                     </button>
                 }
+                @if (Model.UserId != currentUserId)
+                {
+                    <button type="button"
+                            style="background:none; border:none; color:#f59e0b; cursor:pointer; font-size:0.82rem; padding:0.2rem 0.4rem; margin-left: auto;"
+                            data-bs-toggle="modal"
+                            data-bs-target="#reportModal"
+                            data-report-type="Comment"
+                            data-report-targetid="@Model.Id">
+                        🚩 Zgłoś
+                    </button>
+                }
             }
             else
             {
@@ -6216,65 +7465,208 @@ namespace GameWiki.Views.Admin
 @model IEnumerable<GameWiki.DTOs.Game.GameDto>
 @{
     ViewData["Title"] = "Games";
+    var genres = ViewBag.Genres as List<GameWiki.Models.Genre>;
+    var platforms = ViewBag.Platforms as List<GameWiki.Models.Platform>;
+    string search = ViewBag.Search ?? "";
+    int? genreId = ViewBag.GenreId;
+    int? platformId = ViewBag.PlatformId;
+    bool isFiltered = !string.IsNullOrEmpty(search) || genreId.HasValue || platformId.HasValue;
 }
 
 <div class="gw-section">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+
+   
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
         <div>
             <h1 class="gw-section-title">🎮 Games</h1>
-            <p class="gw-section-sub">Przeglądaj bazę gier</p>
+            <p class="gw-section-sub">
+                @if (isFiltered)
+                {
+                    <span>Wyniki filtrowania — <strong style="color:#a78bfa;">@Model.Count()</strong> gier</span>
+                }
+                else
+                {
+                    <span>Przeglądaj bazę gier</span>
+                }
+            </p>
         </div>
-        @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
-        {
-            <a asp-action="Create" class="gw-btn-primary">+ Dodaj grę</a>
-        }
+        <div style="display:flex; gap:0.8rem; align-items:center;">
+            <button class="gw-btn-outline" id="filterToggleBtn" onclick="toggleFilter()">
+                🔽 Filtruj
+                @if (isFiltered)
+                {
+                    <span class="gw-filter-active-dot"></span>
+                }
+            </button>
+            @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+            {
+                <a asp-action="Create" class="gw-btn-primary">+ Dodaj grę</a>
+            }
+        </div>
     </div>
 
-    <div class="gw-games-grid">
-        @foreach (var game in Model)
-        {
-            <div class="gw-game-card">
-                <a asp-action="Details" asp-route-id="@game.Id" class="gw-game-banner-link">
-                    @if (!string.IsNullOrEmpty(game.BackgroundImage))
-                    {
-                        <img src="@game.BackgroundImage" class="gw-game-banner" alt="@game.Title" />
-                    }
-                    else
-                    {
-                        <div class="gw-game-banner-placeholder">🎮</div>
-                    }
-            </a>
-            <div class="gw-game-info">
-                <a asp-action="Details" asp-route-id="@game.Id" class="gw-game-title">
-                    @game.Title
-                </a>
-                <span class="gw-game-date">@game.ReleaseDate.ToString("yyyy")</span>
-                <p class="gw-game-desc">
-                    @(game.Description.Length > 100
-                                        ? game.Description[..100] + "..."
-                                        : game.Description)
-                </p>
-                @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
-                    {
-                        <div class="gw-game-actions">
-                            <a asp-action="Details" asp-route-id="@game.Id" class="gw-action-link gw-action-details">Szczegóły</a>
-                            <span class="gw-action-sep">|</span>
-                            <a asp-action="Edit" asp-route-id="@game.Id" class="gw-action-link gw-action-edit">Edytuj</a>
-                            <span class="gw-action-sep">|</span>
-                            <a asp-action="Delete" asp-route-id="@game.Id" class="gw-action-link gw-action-delete">Usuń</a>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="gw-game-actions">
-                            <a asp-action="Details" asp-route-id="@game.Id" class="gw-action-link gw-action-details">Szczegóły</a>
-                        </div>
-                    }
+    
+    <div id="filterPanel" class="gw-filter-panel @(isFiltered ? "open" : "")">
+        <form asp-action="Index" method="get" id="filterForm">
+            <div class="gw-filter-grid">
+
+                <div class="gw-form-group" style="margin:0;">
+                    <label class="gw-label">Szukaj po tytule</label>
+                    <input type="text" name="search" value="@search"
+                           class="gw-input" placeholder="np. Wiedźmin..." />
+                </div>
+
+                <div class="gw-form-group" style="margin:0;">
+                    <label class="gw-label">Gatunek</label>
+                    <select name="genreId" class="gw-input gw-select">
+                        <option value="">— Wszystkie —</option>
+                        @foreach (var genre in genres!)
+                        {
+                            if (genreId == genre.Id)
+                            {
+                                <option value="@genre.Id" selected>@genre.Name</option>
+                            }
+                            else
+                            {
+                                <option value="@genre.Id">@genre.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+
+                <div class="gw-form-group" style="margin:0;">
+                    <label class="gw-label">Platforma</label>
+                    <select name="platformId" class="gw-input gw-select">
+                        <option value="">— Wszystkie —</option>
+                        @foreach (var platform in platforms!)
+                        {
+                            if (platformId == platform.Id)
+                            {
+                                <option value="@platform.Id" selected>@platform.Name</option>
+                            }
+                            else
+                            {
+                                <option value="@platform.Id">@platform.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+
             </div>
-        </div>
+
+            <div style="display:flex; gap:0.8rem; margin-top:1.2rem;">
+                <button type="submit" class="gw-btn-primary" style="padding:0.6rem 1.4rem;">
+                    🔍 Szukaj
+                </button>
+                @if (isFiltered)
+                {
+                    <a asp-action="Index" class="gw-btn-outline" style="padding:0.6rem 1.4rem;">
+                        ✕ Wyczyść filtry
+                    </a>
                 }
+            </div>
+        </form>
     </div>
+
+    
+    @if (!Model.Any())
+    {
+        <div style="text-align:center; padding:4rem 0; color:#64748b;">
+            <div style="font-size:3rem; margin-bottom:1rem;">🔍</div>
+            <p style="font-size:1.1rem;">Nie znaleziono żadnych gier.</p>
+            <a asp-action="Index" class="gw-btn-outline" style="margin-top:1rem; display:inline-block;">
+                Wyczyść filtry
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="gw-games-grid">
+            @foreach (var game in Model)
+            {
+                <div class="gw-game-card">
+                    <a asp-action="Details" asp-route-id="@game.Id" class="gw-game-banner-link">
+                        @if (!string.IsNullOrEmpty(game.BackgroundImage))
+                        {
+                            <img src="@game.BackgroundImage" class="gw-game-banner" alt="@game.Title" />
+                        }
+                        else
+                        {
+                            <div class="gw-game-banner-placeholder">🎮</div>
+                        }
+                    </a>
+                    <div class="gw-game-info">
+                        <a asp-action="Details" asp-route-id="@game.Id" class="gw-game-title">
+                            @game.Title
+                        </a>
+                        <span class="gw-game-date">@game.ReleaseDate.ToString("yyyy")</span>
+                        <p class="gw-game-desc">
+                            @(game.Description.Length > 100
+                                ? game.Description[..100] + "..."
+                                : game.Description)
+                        </p>
+                        @if (game.LocalRating.HasValue)
+                        {
+                            <div style="display:flex; align-items:center; gap:0.4rem;">
+                                <div class="gw-stars-display">
+                                    @for (int i = 1; i <= 5; i++)
+                                    {
+                                        <span class="gw-star @(i <= Math.Round(game.LocalRating.Value) ? "filled" : "")">★</span>
+                                    }
+                                </div>
+                                <span style="font-size:0.78rem; color:#64748b;">(@game.LocalRatingsCount)</span>
+                            </div>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+                        {
+                            <div class="gw-game-actions">
+                                <a asp-action="Details" asp-route-id="@game.Id" class="gw-action-link gw-action-details">Szczegóły</a>
+                                <span class="gw-action-sep">|</span>
+                                <a asp-action="Edit" asp-route-id="@game.Id" class="gw-action-link gw-action-edit">Edytuj</a>
+                                <span class="gw-action-sep">|</span>
+                                <a asp-action="Delete" asp-route-id="@game.Id" class="gw-action-link gw-action-delete">Usuń</a>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="gw-game-actions">
+                                <a asp-action="Details" asp-route-id="@game.Id" class="gw-action-link gw-action-details">Szczegóły</a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
 </div>
+
+@section Scripts {
+    <script>
+        function toggleFilter() {
+            const panel = document.getElementById('filterPanel');
+            const btn = document.getElementById('filterToggleBtn');
+            const isOpen = panel.classList.toggle('open');
+            btn.textContent = isOpen ? '🔼 Filtruj' : '🔽 Filtruj';
+            // Przywróć kropkę jeśli są aktywne filtry
+            @if (isFiltered)
+            {
+                <text>
+                if (isOpen) btn.innerHTML += '<span class="gw-filter-active-dot"></span>';
+                </text>
+            }
+        }
+
+        // Otwórz panel automatycznie jeśli są aktywne filtry
+        document.addEventListener('DOMContentLoaded', () => {
+            @if (isFiltered)
+            {
+                <text>
+                document.getElementById('filterToggleBtn').innerHTML = '🔼 Filtruj <span class="gw-filter-active-dot"></span>';
+                </text>
+            }
+        });
+    </script>
+}
 
 ====== Index.cshtml ======
 @using GameWiki.Services
@@ -6369,11 +7761,38 @@ namespace GameWiki.Views.Admin
 </div>
 
 ====== Index.cshtml ======
+@using GameWiki.Models
 @{
     ViewData["Title"] = "Strona główna";
+    var featuredGames = ViewBag.FeaturedGames as IEnumerable<dynamic>;
+    var genres = ViewBag.Genres as List<Genre>;
+
+    var genreIcons = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Action"] = "⚔️",
+        ["RPG"] = "🧙",
+        ["Shooter"] = "🔫",
+        ["Sport"] = "⚽",
+        ["Puzzle"] = "🧩",
+        ["Racing"] = "🏎️",
+        ["Horror"] = "👻",
+        ["Adventure"] = "🗺️",
+        ["Strategy"] = "♟️",
+        ["Simulation"] = "🏗️",
+        ["Fighting"] = "🥊",
+        ["Platformer"] = "🕹️",
+        ["Indie"] = "🎨",
+        ["Arcade"] = "👾",
+        ["Card"] = "🃏",
+        ["Casual"] = "🎪",
+        ["Family"] = "👨‍👩‍👧",
+        ["Massively Multiplayer"] = "🌐",
+        ["Educational"] = "📚",
+        ["Sports"] = "🏆",
+    };
 }
 
-<!-- HERO SECTION -->
+<!-- HERO -->
 <div class="gw-hero">
     <div class="gw-hero-content">
         <div class="gw-hero-badge">🎮 Encyklopedia Gier</div>
@@ -6386,9 +7805,12 @@ namespace GameWiki.Views.Admin
             <a asp-controller="Games" asp-action="Index" class="gw-btn-primary">
                 Przeglądaj gry
             </a>
-            <a asp-controller="Account" asp-action="Register" class="gw-btn-outline">
-                Dołącz do społeczności
-            </a>
+            @if (!User.Identity.IsAuthenticated)
+            {
+                <a asp-controller="Account" asp-action="Register" class="gw-btn-outline">
+                    Dołącz do społeczności
+                </a>
+            }
         </div>
         <div class="gw-hero-stats">
             <div class="gw-stat">
@@ -6407,74 +7829,55 @@ namespace GameWiki.Views.Admin
             </div>
         </div>
     </div>
+
+    <!-- MOZAIKA OKŁADEK -->
     <div class="gw-hero-visual">
-        <div class="gw-hero-card gw-card-1">
-            <div class="gw-hcard-icon">⚔️</div>
-            <div class="gw-hcard-title">RPG</div>
-            <div class="gw-hcard-sub">Otwarte światy</div>
+        <div class="gw-mosaic">
+            @if (featuredGames != null)
+            {
+                int i = 0;
+                foreach (var game in featuredGames)
+                {
+                    <a asp-controller="Games" asp-action="Details" asp-route-id="@game.Id"
+                       class="gw-mosaic-item gw-mosaic-@(i % 6)"
+                       title="@game.Title">
+                        <img src="@game.BackgroundImage" alt="@game.Title" />
+                        <div class="gw-mosaic-overlay">
+                            <span>@game.Title</span>
+                        </div>
+                    </a>
+                    i++;
+                }
+            }
         </div>
-        <div class="gw-hero-card gw-card-2">
-            <div class="gw-hcard-icon">🏎️</div>
-            <div class="gw-hcard-title">Racing</div>
-            <div class="gw-hcard-sub">Wyścigi</div>
-        </div>
-        <div class="gw-hero-card gw-card-3">
-            <div class="gw-hcard-icon">🔫</div>
-            <div class="gw-hcard-title">Shooter</div>
-            <div class="gw-hcard-sub">FPS & TPS</div>
-        </div>
-        <div class="gw-hero-card gw-card-4">
-            <div class="gw-hcard-icon">🧩</div>
-            <div class="gw-hcard-title">Puzzle</div>
-            <div class="gw-hcard-sub">Łamigłówki</div>
-        </div>
-        <div class="gw-hero-orb"></div>
+        <div class="gw-mosaic-fade-left"></div>
     </div>
 </div>
 
-<!-- SEKCJA: PRZEGLĄDAJ WEDŁUG GATUNKU -->
+<!-- GATUNKI -->
 <section class="gw-section">
     <div class="gw-section-header">
         <h2 class="gw-section-title">Przeglądaj według gatunku</h2>
         <p class="gw-section-sub">Znajdź gry dopasowane do swoich upodobań</p>
     </div>
     <div class="gw-genres-grid">
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">⚔️</span>
-            <span class="gw-genre-name">RPG</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">🔫</span>
-            <span class="gw-genre-name">Shooter</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">⚽</span>
-            <span class="gw-genre-name">Sport</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">🧩</span>
-            <span class="gw-genre-name">Puzzle</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">🏎️</span>
-            <span class="gw-genre-name">Racing</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">👻</span>
-            <span class="gw-genre-name">Horror</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">🛸</span>
-            <span class="gw-genre-name">Sci-Fi</span>
-        </a>
-        <a href="#" class="gw-genre-card">
-            <span class="gw-genre-icon">🗺️</span>
-            <span class="gw-genre-name">Adventure</span>
-        </a>
+        @if (genres != null && genres.Any())
+        {
+            foreach (var genre in genres)
+            {
+                var icon = genreIcons.ContainsKey(genre.Name) ? genreIcons[genre.Name] : "🎮";
+                <a asp-controller="Games" asp-action="Index"
+                   asp-route-genreId="@genre.Id"
+                   class="gw-genre-card">
+                    <span class="gw-genre-icon">@icon</span>
+                    <span class="gw-genre-name">@genre.Name</span>
+                </a>
+            }
+        }
     </div>
 </section>
 
-<!-- SEKCJA: DLACZEGO GAMEWIKI -->
+<!-- FEATURES -->
 <section class="gw-section gw-features-section">
     <div class="gw-section-header">
         <h2 class="gw-section-title">Dlaczego GameWiki?</h2>
@@ -6504,24 +7907,22 @@ namespace GameWiki.Views.Admin
     </div>
 </section>
 
-<!-- SEKCJA: CTA -->
-<section class="gw-cta-section">
-    <div class="gw-cta-content">
-        @if (!User.Identity.IsAuthenticated)
-        {
-            <h2 class="gw-cta-title">Gotowy, żeby zacząć?</h2>
-            <p class="gw-cta-sub">Dołącz do społeczności graczy. Rejestracja jest bezpłatna.</p>
-            <div class="gw-cta-actions">
-                <a asp-controller="Account" asp-action="Register" class="gw-btn-primary">
-                    Zarejestruj się za darmo
-                </a>
-                <a asp-controller="Account" asp-action="Login" class="gw-btn-ghost">
-                    Zaloguj się
-                </a>
-            </div>
-        }
-    </div>
-</section>
+<!-- CTA -->
+@if (!User.Identity.IsAuthenticated)
+{
+    <section class="gw-cta-section">
+        <h2 class="gw-cta-title">Gotowy, żeby zacząć?</h2>
+        <p class="gw-cta-sub">Dołącz do społeczności graczy. Rejestracja jest bezpłatna.</p>
+        <div class="gw-cta-actions">
+            <a asp-controller="Account" asp-action="Register" class="gw-btn-primary">
+                Zarejestruj się za darmo
+            </a>
+            <a asp-controller="Account" asp-action="Login" class="gw-btn-ghost">
+                Zaloguj się
+            </a>
+        </div>
+    </section>
+}
 
 ====== Privacy.cshtml ======
 @{
@@ -6750,7 +8151,20 @@ namespace GameWiki.Views.Admin
             <h1 class="gw-section-title">⭐ Recenzje — @ViewBag.GameTitle</h1>
         </div>
     }
-
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-3">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
     <div style="display:flex; gap:0.8rem; margin-bottom:2rem; flex-wrap:wrap;">
         @if (User.Identity?.IsAuthenticated == true)
         {
@@ -6815,6 +8229,16 @@ namespace GameWiki.Views.Admin
                                 </button>
                             </form>
                         </div>
+                    }
+                    @if (User.Identity?.IsAuthenticated == true && !review.IsOwner)
+                    {
+                        <button type="button" class="btn btn-link text-warning p-0 ms-3 text-decoration-none" style="font-size: 0.85rem;"
+                                data-bs-toggle="modal"
+                                data-bs-target="#reportModal"
+                                data-report-type="Review"
+                                data-report-targetid="@review.Id">
+                            🚩 Zgłoś
+                        </button>
                     }
                 </div>
             }
@@ -6932,17 +8356,18 @@ namespace GameWiki.Views.Admin
                                 </li>
                                 @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
                                 {
+                                    <li><hr class="dropdown-divider border-secondary"></li>
                                     <li class="nav-item">
-                                        <a class="nav-link" asp-controller="Report" asp-action="Index">📊 Raporty</a>
+                                        <a class="dropdown-item text-warning" asp-controller="Report" asp-action="Index">📊 Raporty</a>
                                     </li>
-                                }
-                                @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
-                                {
                                     <li>
                                         <a class="dropdown-item text-warning" asp-controller="Admin" asp-action="Index">🛡️ Panel Zarządzania</a>
                                     </li>
                                     <li class="nav-item">
                                         <a class="dropdown-item text-info"  asp-controller="GamesImport" asp-action="Index" class="nav-link">📥 Import RAWG</a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item text-danger" asp-controller="Admin" asp-action="Reports">🚩 Zgłoszenia</a>
                                     </li>
                                     <li><hr class="dropdown-divider border-secondary"></li>
                                 }
@@ -6978,6 +8403,52 @@ namespace GameWiki.Views.Admin
         <div class="container">
             &copy; 2026 - GameWiki
         </div>
+        <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark text-light border-secondary">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title text-warning">🚩 Zgłoś naruszenie</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form asp-controller="Reports" asp-action="Create" method="post">
+                        <div class="modal-body">
+                            <input type="hidden" name="type" id="reportType" value="" />
+                            <input type="hidden" name="targetId" id="reportTargetId" value="" />
+                            <input type="hidden" name="returnUrl" id="reportReturnUrl" value="" />
+
+                            <p class="small text-muted mb-3">Opisz krótko, dlaczego zgłaszasz ten materiał. Administracja rozpatrzy to najszybciej, jak to możliwe.</p>
+
+                            <div class="mb-3">
+                                <label class="form-label text-uppercase small fw-bold" style="color: #94a3b8;">Powód zgłoszenia:</label>
+                                <textarea name="reason" class="form-control bg-dark text-light border-secondary" rows="4" required maxlength="500"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-outline-light rounded-pill" data-bs-dismiss="modal">Anuluj</button>
+                            <button type="submit" class="btn btn-warning rounded-pill">Wyślij zgłoszenie</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var reportModal = document.getElementById('reportModal');
+                if (reportModal) {
+                    reportModal.addEventListener('show.bs.modal', function (event) {
+                        var button = event.relatedTarget;
+                        var type = button.getAttribute('data-report-type');
+                        var targetId = button.getAttribute('data-report-targetid');
+                        var returnUrl = window.location.pathname + window.location.search;
+
+                        reportModal.querySelector('#reportType').value = type;
+                        reportModal.querySelector('#reportTargetId').value = targetId;
+                        reportModal.querySelector('#reportReturnUrl').value = returnUrl;
+                    });
+                }
+            });
+        </script>
     </footer>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
@@ -8252,6 +9723,140 @@ body {
 .gw-review-footer {
     padding-top: 0.6rem;
     border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+/* ===== FILTER PANEL ===== */
+.gw-filter-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease, padding 0.35s ease;
+    background: rgba(30, 35, 50, 0.8);
+    border: 1px solid rgba(124, 58, 237, 0.2);
+    border-radius: 14px;
+    padding: 0 1.5rem;
+    margin-bottom: 0;
+}
+
+    .gw-filter-panel.open {
+        max-height: 400px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+.gw-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.gw-select {
+    appearance: none;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+}
+
+    .gw-select option {
+        background: #1e2332;
+        color: #e2e8f0;
+    }
+
+.gw-filter-active-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: #a78bfa;
+    border-radius: 50%;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+/* ===== MOSAIC ===== */
+.gw-hero-visual {
+    position: relative;
+    overflow: hidden;
+}
+
+.gw-mosaic {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 10px;
+    height: 420px;
+    width: 100%;
+}
+
+.gw-mosaic-item {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.07);
+    text-decoration: none;
+    transition: transform 0.3s, border-color 0.3s;
+}
+
+    .gw-mosaic-item:hover {
+        transform: scale(1.03);
+        border-color: rgba(124, 58, 237, 0.5);
+        z-index: 2;
+    }
+
+    .gw-mosaic-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        transition: opacity 0.3s;
+    }
+
+    .gw-mosaic-item:hover img {
+        opacity: 0.7;
+    }
+
+/* Pierwsze i czwarte zdjęcie trochę wyższe */
+.gw-mosaic-0,
+.gw-mosaic-3 {
+    grid-row: span 1;
+    transform: translateY(-8px);
+}
+
+.gw-mosaic-1,
+.gw-mosaic-4 {
+    transform: translateY(8px);
+}
+
+.gw-mosaic-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(15,17,23,0.9) 0%, transparent 60%);
+    display: flex;
+    align-items: flex-end;
+    padding: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.gw-mosaic-item:hover .gw-mosaic-overlay {
+    opacity: 1;
+}
+
+.gw-mosaic-overlay span {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    line-height: 1.2;
+}
+
+.gw-mosaic-fade-left {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 80px;
+    height: 100%;
+    background: linear-gradient(to right, #0f1117, transparent);
+    pointer-events: none;
 }
 
 ====== bootstrap-grid.css ======

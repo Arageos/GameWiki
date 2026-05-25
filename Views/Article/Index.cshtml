@@ -2,9 +2,9 @@
 @using GameWiki.Models
 @{
     ViewData["Title"] = "Artykuły";
-    var games = ViewBag.Games as List<Game> ?? new List<Game>();
     var selectedGameId = (int?)ViewBag.SelectedGameId;
-    var selectedGame = selectedGameId.HasValue ? games.FirstOrDefault(g => g.Id == selectedGameId.Value) : null;
+    var selectedGameTitle = ViewBag.SelectedGameTitle as string;
+    var gameSearch = ViewBag.GameSearch as string;
 }
 
 <div class="gw-section">
@@ -12,10 +12,17 @@
         <div>
             <h1 class="gw-section-title">📄 Artykuły</h1>
             <p class="gw-section-sub">
-                @if (selectedGame != null)
+                @if (selectedGameTitle != null)
                 {
                     <span>
-                        Filtrowanie: <strong style="color:#a78bfa;">@selectedGame.Title</strong>
+                        Filtrowanie: <strong style="color:#a78bfa;">@selectedGameTitle</strong>
+                        &nbsp;·&nbsp; <a asp-action="Index" class="gw-action-link" style="font-size:0.85rem;">Pokaż wszystkie</a>
+                    </span>
+                }
+                else if (!string.IsNullOrEmpty(gameSearch))
+                {
+                    <span>
+                        Wyniki dla: <strong style="color:#a78bfa;">@gameSearch</strong>
                         &nbsp;·&nbsp; <a asp-action="Index" class="gw-action-link" style="font-size:0.85rem;">Pokaż wszystkie</a>
                     </span>
                 }
@@ -39,22 +46,40 @@
         </div>
     }
 
-    @* ── FILTR PO GRZE ── *@
-    <div style="margin-bottom:1.5rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
-        <span style="color:#64748b; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.05em;">Filtruj:</span>
-        <a asp-action="Index"
-           style="padding:0.3rem 0.85rem; border-radius:999px; font-size:0.82rem; font-weight:600; text-decoration:none;
-                  @(selectedGameId == null ? "background:#6366f1; color:#fff;" : "background:rgba(255,255,255,0.06); color:#94a3b8; border:1px solid rgba(255,255,255,0.1);")">
-            Wszystkie
-        </a>
-        @foreach (var game in games)
-        {
-            <a asp-action="Index" asp-route-gameId="@game.Id"
-               style="padding:0.3rem 0.85rem; border-radius:999px; font-size:0.82rem; font-weight:600; text-decoration:none;
-                          @(selectedGameId == game.Id ? "background:#6366f1; color:#fff;" : "background:rgba(255,255,255,0.06); color:#94a3b8; border:1px solid rgba(255,255,255,0.1);")">
-                @game.Title
-            </a>
-        }
+    @* ── FILTR PO GRZE Z AUTOCOMPLETE ── *@
+    <div style="margin-bottom:1.5rem;">
+        <form id="gameSearchForm" asp-action="Index" method="get"
+              style="display:flex; gap:0.5rem; align-items:center; max-width:420px;">
+            <div style="flex:1; position:relative;">
+                <input id="gameSearchInput"
+                       type="text"
+                       name="gameSearch"
+                       value="@gameSearch"
+                       placeholder="Szukaj po tytule gry..."
+                       autocomplete="off"
+                       style="width:100%; padding:0.45rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.12);
+                              background:rgba(255,255,255,0.06); color:#e2e8f0; font-size:0.85rem; outline:none;" />
+                <ul id="gameSearchDropdown"
+                    style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0;
+                           background:#1e1e2e; border:1px solid rgba(255,255,255,0.12); border-radius:12px;
+                           list-style:none; margin:0; padding:0.3rem 0; z-index:999;
+                           box-shadow:0 8px 24px rgba(0,0,0,0.4); overflow:hidden;">
+                </ul>
+            </div>
+            <button type="submit"
+                    style="padding:0.45rem 1.1rem; border-radius:999px; border:none; cursor:pointer;
+                           background:#6366f1; color:#fff; font-size:0.85rem; font-weight:600; white-space:nowrap;">
+                Szukaj
+            </button>
+            @if (!string.IsNullOrEmpty(gameSearch) || selectedGameId.HasValue)
+            {
+                <a asp-action="Index"
+                   style="padding:0.45rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.12);
+                              background:transparent; color:#94a3b8; font-size:0.85rem; text-decoration:none; font-weight:600; white-space:nowrap;">
+                    ✕ Wyczyść
+                </a>
+            }
+        </form>
     </div>
 
     @* ── LISTA ARTYKUŁÓW ── *@
@@ -63,9 +88,13 @@
         <div class="gw-auth-card" style="text-align:center; padding:3rem;">
             <div style="font-size:3rem; margin-bottom:1rem;">📭</div>
             <p style="color:#94a3b8;">
-                @if (selectedGame != null)
+                @if (selectedGameTitle != null)
                 {
-                    <span>Brak artykułów dla gry <strong>@selectedGame.Title</strong>.</span>
+                    <span>Brak artykułów dla gry <strong>@selectedGameTitle</strong>.</span>
+                }
+                else if (!string.IsNullOrEmpty(gameSearch))
+                {
+                    <span>Brak artykułów dla gier zawierających <strong>@gameSearch</strong>.</span>
                 }
                 else
                 {
@@ -144,3 +173,106 @@
         </div>
     }
 </div>
+
+@section Scripts {
+    <script>
+        const input = document.getElementById('gameSearchInput');
+        const dropdown = document.getElementById('gameSearchDropdown');
+        const form = document.getElementById('gameSearchForm');
+        let debounceTimer = null;
+
+        input.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            const query = this.value.trim();
+
+            if (query.length < 2) {
+                hideDropdown();
+                return;
+            }
+
+            debounceTimer = setTimeout(() => fetchSuggestions(query), 250);
+        });
+
+        async function fetchSuggestions(query) {
+            try {
+                const res = await fetch(`/Article/SearchGames?q=${encodeURIComponent(query)}`);
+                const games = await res.json();
+
+                if (!games.length) {
+                    hideDropdown();
+                    return;
+                }
+
+                dropdown.innerHTML = '';
+                games.forEach(game => {
+                    const li = document.createElement('li');
+                    li.textContent = game.title;
+                    li.style.cssText = `
+                        padding: 0.5rem 1rem;
+                        cursor: pointer;
+                        font-size: 0.85rem;
+                        color: #e2e8f0;
+                        transition: background 0.15s;
+                    `;
+                    li.addEventListener('mouseenter', () => li.style.background = 'rgba(99,102,241,0.2)');
+                    li.addEventListener('mouseleave', () => li.style.background = 'transparent');
+                    li.addEventListener('mousedown', (e) => {
+                        e.preventDefault(); // żeby nie odpalił blur na inpucie przed kliknięciem
+                        input.value = game.title;
+                        hideDropdown();
+                        form.submit();
+                    });
+                    dropdown.appendChild(li);
+                });
+
+                dropdown.style.display = 'block';
+            } catch (e) {
+                hideDropdown();
+            }
+        }
+
+        function hideDropdown() {
+            dropdown.style.display = 'none';
+            dropdown.innerHTML = '';
+        }
+
+        // Zamknij dropdown przy kliknięciu gdziekolwiek indziej
+        document.addEventListener('click', function (e) {
+            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                hideDropdown();
+            }
+        });
+
+        // Nawigacja klawiaturą (strzałki + Enter)
+        let activeIndex = -1;
+        input.addEventListener('keydown', function (e) {
+            const items = dropdown.querySelectorAll('li');
+            if (!items.length) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeIndex = Math.min(activeIndex + 1, items.length - 1);
+                updateActive(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeIndex = Math.max(activeIndex - 1, -1);
+                updateActive(items);
+            } else if (e.key === 'Enter' && activeIndex >= 0) {
+                e.preventDefault();
+                input.value = items[activeIndex].textContent;
+                hideDropdown();
+                form.submit();
+            } else if (e.key === 'Escape') {
+                hideDropdown();
+                activeIndex = -1;
+            }
+        });
+
+        function updateActive(items) {
+            items.forEach((item, i) => {
+                item.style.background = i === activeIndex ? 'rgba(99,102,241,0.2)' : 'transparent';
+            });
+            if (activeIndex >= 0) input.value = items[activeIndex].textContent;
+        }
+    </script>
+}

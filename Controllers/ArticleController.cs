@@ -20,10 +20,10 @@ namespace GameWiki.Controllers
 
         // ─── GLOBALNA LISTA ARTYKUŁÓW (opcjonalny filtr po grze) ──────────────────
 
-        public async Task<IActionResult> Index(int? gameId)
+        public async Task<IActionResult> Index(int? gameId, string? gameSearch)
         {
-            ViewBag.Games = await _context.Games.OrderBy(g => g.Title).ToListAsync();
             ViewBag.SelectedGameId = gameId;
+            ViewBag.GameSearch = gameSearch;
 
             var query = _context.Articles
                 .Include(a => a.Author)
@@ -31,11 +31,37 @@ namespace GameWiki.Controllers
                 .AsQueryable();
 
             if (gameId.HasValue)
+            {
                 query = query.Where(a => a.GameId == gameId.Value);
+                ViewBag.SelectedGameTitle = await _context.Games
+                    .Where(g => g.Id == gameId.Value)
+                    .Select(g => g.Title)
+                    .FirstOrDefaultAsync();
+            }
+            else if (!string.IsNullOrWhiteSpace(gameSearch))
+            {
+                query = query.Where(a => a.Game.Title.Contains(gameSearch));
+            }
 
             var articles = await query.OrderByDescending(a => a.CreatedAt).ToListAsync();
 
             return View(articles);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> SearchGames(string q)
+        {
+            if (string.IsNullOrWhiteSpace(q))
+                return Json(new List<object>());
+
+            var games = await _context.Games
+                .Where(g => g.Title.Contains(q))
+                .OrderBy(g => g.Title)
+                .Take(8)
+                .Select(g => new { g.Id, g.Title })
+                .ToListAsync();
+
+            return Json(games);
         }
 
         // ─── SZCZEGÓŁY ARTYKUŁU ────────────────────────────────────────────────────

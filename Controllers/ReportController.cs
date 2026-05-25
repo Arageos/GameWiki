@@ -44,9 +44,9 @@ namespace GameWiki.Controllers
 
             // Dane do raportu
             var newGames = await _context.Games
-                .Where(g => g.ReleaseDate >= dateFrom && g.ReleaseDate <= dateTo)
-                .OrderByDescending(g => g.ReleaseDate)
-                .Select(g => new { g.Title, g.ReleaseDate })
+                .Where(g => g.AddedAt >= dateFrom && g.AddedAt <= dateTo)
+                .OrderByDescending(g => g.AddedAt)
+                .Select(g => new { g.Title, g.AddedAt })
                 .ToListAsync();
 
             var newArticles = await _context.Articles
@@ -144,7 +144,7 @@ namespace GameWiki.Controllers
                             table.Header(h =>
                             {
                                 h.Cell().Background("#f1f5f9").Padding(6).Text("Tytuł").Bold().FontSize(10);
-                                h.Cell().Background("#f1f5f9").Padding(6).Text("Data wydania").Bold().FontSize(10);
+                                h.Cell().Background("#f1f5f9").Padding(6).Text("Data dodania").Bold().FontSize(10);
                             });
 
                             if (newGames.Any())
@@ -152,7 +152,7 @@ namespace GameWiki.Controllers
                                 foreach (var g in newGames)
                                 {
                                     table.Cell().BorderBottom(1).BorderColor("#f1f5f9").Padding(6).Text(g.Title).FontSize(10);
-                                    table.Cell().BorderBottom(1).BorderColor("#f1f5f9").Padding(6).Text(g.ReleaseDate.ToString("dd.MM.yyyy")).FontSize(10);
+                                    table.Cell().BorderBottom(1).BorderColor("#f1f5f9").Padding(6).Text(g.AddedAt.ToString("dd.MM.yyyy")).FontSize(10);
                                 }
                             }
                             else
