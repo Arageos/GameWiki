@@ -3,6 +3,23 @@
     ViewData["Title"] = "Logowanie";
 }
 
+<div class="container mt-4" style="max-width: 450px; margin: 0 auto;">
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+</div>
+
 <div class="gw-auth-wrapper">
     <div class="gw-auth-card">
         <div class="gw-auth-header">
@@ -41,6 +58,54 @@
             Nie masz konta?
             <a asp-controller="Account" asp-action="Register" class="gw-auth-link">Zarejestruj się</a>
         </div>
+
+        @if (ViewBag.BannedEmail != null)
+        {
+            <div class="mt-4 text-center border-top border-secondary pt-3">
+                @if (ViewBag.BanAppealStatus == GameWiki.Models.AppealStatus.Pending)
+                {
+                    <p class="text-warning small mb-0">⏳ Już wysłałeś odwołanie. Poczekaj na werdykt administracji.</p>
+                }
+                else if (ViewBag.BanAppealStatus == GameWiki.Models.AppealStatus.Rejected)
+                {
+                    <p class="text-danger fw-bold small mb-0">❌ Twoje odwołanie zostało odrzucone. Decyzja jest ostateczna.</p>
+                }
+                else
+                {
+                    <p class="text-danger small mb-2">Uważasz, że blokada konta jest niesłuszna?</p>
+                    <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#banAppealModal">
+                        ⚖️ Złóż odwołanie od blokady
+                    </button>
+                }
+            </div>
+
+            @if (ViewBag.BanAppealStatus != GameWiki.Models.AppealStatus.Pending && ViewBag.BanAppealStatus != GameWiki.Models.AppealStatus.Rejected)
+            {
+                <div class="modal fade" id="banAppealModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content bg-dark text-light border-secondary">
+                            <div class="modal-header border-secondary">
+                                <h5 class="modal-title text-info">⚖️ Napisz odwołanie</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form asp-controller="Reports" asp-action="AppealBan" method="post">
+                                <div class="modal-body text-start">
+                                    <input type="hidden" name="email" value="@ViewBag.BannedEmail" />
+                                    <p class="small text-muted mb-3">Opisz szczegółowo, dlaczego uważasz, że decyzja o blokadzie była błędna.</p>
+                                    <div class="mb-3">
+                                        <textarea name="message" class="form-control bg-dark text-light border-secondary" rows="5" required maxlength="1000" placeholder="Treść odwołania..."></textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer border-secondary">
+                                    <button type="button" class="btn btn-outline-light rounded-pill" data-bs-dismiss="modal">Anuluj</button>
+                                    <button type="submit" class="btn btn-info rounded-pill">Wyślij odwołanie</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
     </div>
 </div>
 

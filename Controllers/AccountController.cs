@@ -92,7 +92,30 @@ namespace GameWiki.Controllers
             }
             if (user.IsBanned)
             {
-                ModelState.AddModelError(string.Empty, "Zostałeś zablokowany. Skontaktuj się z administracją.");
+                var banNotification = await _context.UserNotifications
+                    .Where(n => n.UserId == user.Id && n.Type == NotificationType.Ban)
+                    .OrderByDescending(n => n.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                var reason = banNotification?.Reason ?? "Brak podanego powodu.";
+                ModelState.AddModelError(string.Empty, $"Twoje konto zostało zablokowane. Skontaktuj się z Administracją. Powód: {reason}");
+
+                ViewBag.BannedEmail = user.Email;
+
+                var lastBanAppeal = await _context.Appeals
+                    .Where(a => a.UserId == user.Id && a.Subject == "Odwołanie od blokady konta")
+                    .OrderByDescending(a => a.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                if (lastBanAppeal != null && banNotification != null && lastBanAppeal.CreatedAt < banNotification.CreatedAt)
+                {
+                    ViewBag.BanAppealStatus = null; // Resetujemy status dla nowego cyklu bana
+                }
+                else
+                {
+                    ViewBag.BanAppealStatus = lastBanAppeal?.Status;
+                }
+
                 return View(dto);
             }
 
@@ -315,6 +338,56 @@ namespace GameWiki.Controllers
                 return RedirectToAction(nameof(Settings));
             }
             return RedirectToAction(nameof(Settings));
+        }
+
+        [Authorize]
+        public async Task<IActionResult> Notifications()
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+            var notifications = await _context.UserNotifications
+                .Where(n => n.UserId == userId)
+                .OrderByDescending(n => n.CreatedAt)
+                .ToListAsync();
+
+            return View(notifications);
+        }
+
+        [HttpPost]
+        [Authorize]
+        public async Task<IActionResult> DeleteNotification(int id)
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+            // Upewniamy się, że powiadomienie istnieje i należy do tego użytkownika
+            var notification = await _context.UserNotifications
+                .FirstOrDefaultAsync(n => n.Id == id && n.UserId == userId);
+
+            if (notification != null)
+            {
+                _context.UserNotifications.Remove(notification);
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = "Powiadomienie zostało usunięte.";
+            }
+
+            return RedirectToAction(nameof(Notifications));
+        }
+
+        [HttpPost]
+        [Authorize]
+        public async Task<IActionResult> MarkAllRead()
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+            var unread = await _context.UserNotifications
+                .Where(n => n.UserId == userId && !n.IsRead)
+                .ToListAsync();
+
+            foreach (var n in unread)
+                n.IsRead = true;
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Notifications));
         }
     }
 }

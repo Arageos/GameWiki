@@ -44,7 +44,7 @@ namespace GameWiki.Controllers
 
         // --- BANOWANIE / ODBANOWANIE ---
         [HttpPost]
-        public async Task<IActionResult> ToggleBan(int userId)
+        public async Task<IActionResult> ToggleBan(int userId, string? banReason)
         {
             var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             var currentUserRole = User.FindFirst(ClaimTypes.Role)?.Value;
@@ -58,19 +58,39 @@ namespace GameWiki.Controllers
             var targetUser = await _context.Users.FindAsync(userId);
             if (targetUser == null) return NotFound();
 
-            // Zabezpieczenie: Mod nie może zbanować Admina ani innego Moda
-            var targetRole = await _context.UserRoles.Where(ur => ur.UserId == userId).Select(ur => ur.Role.Name).FirstOrDefaultAsync() ?? "User";
+            var targetRole = await _context.UserRoles
+                .Where(ur => ur.UserId == userId)
+                .Select(ur => ur.Role.Name)
+                .FirstOrDefaultAsync() ?? "User";
+
             if (currentUserRole == "Moderator" && (targetRole == "Admin" || targetRole == "Moderator"))
             {
                 TempData["ErrorMessage"] = "Moderator może banować tylko zwykłych użytkowników.";
                 return RedirectToAction(nameof(Index));
             }
 
-            // Przełączamy status bana
             targetUser.IsBanned = !targetUser.IsBanned;
+
+            // Wysyłamy powiadomienie do użytkownika
+            var notification = new UserNotification
+            {
+                UserId = userId,
+                Type = targetUser.IsBanned ? NotificationType.Ban : NotificationType.Unban,
+                Message = targetUser.IsBanned
+                    ? "Twoje konto zostało zablokowane."
+                    : "Twoje konto zostało odblokowane.",
+                Reason = targetUser.IsBanned
+                    ? (string.IsNullOrWhiteSpace(banReason) ? "Brak podanego powodu." : banReason)
+                    : null
+            };
+
+            _context.UserNotifications.Add(notification);
             await _context.SaveChangesAsync();
 
-            TempData["SuccessMessage"] = targetUser.IsBanned ? $"Użytkownik {targetUser.Username} został zbanowany." : $"Użytkownik {targetUser.Username} został odbanowany.";
+            TempData["SuccessMessage"] = targetUser.IsBanned
+                ? $"Użytkownik {targetUser.Username} został zbanowany."
+                : $"Użytkownik {targetUser.Username} został odbanowany.";
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -138,11 +158,33 @@ namespace GameWiki.Controllers
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
 
-            var reportDtos = new List<GameWiki.DTOs.Admin.ReportItemDto>();
+            // Auto-resolve zgłoszeń dla usuniętej treści
+            bool anyResolved = false;
+            foreach (var r in reports.ToList())
+            {
+                bool targetExists = r.Type switch
+                {
+                    ReportType.Article => await _context.Articles.AnyAsync(a => a.Id == r.TargetId),
+                    ReportType.Comment => await _context.Comments.AnyAsync(c => c.Id == r.TargetId),
+                    ReportType.Review => await _context.Reviews.AnyAsync(rv => rv.Id == r.TargetId),
+                    _ => true
+                };
+
+                if (!targetExists)
+                {
+                    r.Status = ReportStatus.Resolved;
+                    reports.Remove(r);
+                    anyResolved = true;
+                }
+            }
+            if (anyResolved)
+                await _context.SaveChangesAsync();
+
+            var reportDtos = new List<ReportItemDto>();
 
             foreach (var r in reports)
             {
-                var dto = new GameWiki.DTOs.Admin.ReportItemDto
+                var dto = new ReportItemDto
                 {
                     ReportId = r.Id,
                     ReporterName = r.Reporter.Username,
@@ -152,7 +194,6 @@ namespace GameWiki.Controllers
                     CreatedAt = r.CreatedAt
                 };
 
-                // Dociągamy treść w zależności od tego, co zgłoszono
                 if (r.Type == ReportType.Comment)
                 {
                     var comment = await _context.Comments.Include(c => c.User).FirstOrDefaultAsync(c => c.Id == r.TargetId);
@@ -161,8 +202,8 @@ namespace GameWiki.Controllers
                 }
                 else if (r.Type == ReportType.Review)
                 {
-                    var review = await _context.Reviews.Include(rev => rev.User).FirstOrDefaultAsync(rev => rev.Id == r.TargetId);
-                    dto.ContentText = review != null ? review.Content : "[Treść została usunięta]";
+                    var review = await _context.Reviews.Include(rv => rv.User).FirstOrDefaultAsync(rv => rv.Id == r.TargetId);
+                    dto.ContentText = review != null ? review.Content! : "[Treść została usunięta]";
                     dto.ContentAuthorName = review?.User?.Username ?? "Nieznany";
                 }
 
@@ -174,34 +215,54 @@ namespace GameWiki.Controllers
 
         // --- ROZPATRYWANIE ZGŁOSZEŃ ---
         [HttpPost]
-        public async Task<IActionResult> HandleReport(int reportId, string actionType)
+        public async Task<IActionResult> HandleReport(int reportId, string actionType, string? deleteReason)
         {
             var report = await _context.Reports.FindAsync(reportId);
             if (report == null) return NotFound();
 
             if (actionType == "delete")
             {
-                // Usuwamy złą treść
+                int? contentAuthorId = null;
+                string contentLabel = "Twoja treść";
+
                 if (report.Type == ReportType.Comment)
                 {
                     var comment = await _context.Comments.FindAsync(report.TargetId);
                     if (comment != null)
                     {
-                        // 1. Najpierw znajdujemy i usuwamy wszystkie odpowiedzi do tego komentarza
-                        var replies = await _context.Comments.Where(c => c.ParentCommentId == comment.Id).ToListAsync();
-                        if (replies.Any())
-                        {
-                            _context.Comments.RemoveRange(replies);
-                        }
+                        contentAuthorId = comment.UserId;
+                        contentLabel = "Twój komentarz";
 
-                        // 2. Dopiero potem usuwamy główny komentarz
+                        var replies = await _context.Comments
+                            .Where(c => c.ParentCommentId == comment.Id)
+                            .ToListAsync();
+                        if (replies.Any())
+                            _context.Comments.RemoveRange(replies);
+
                         _context.Comments.Remove(comment);
                     }
                 }
-                else if (report.Type == ReportType.Review)
+                else if (report.Type == ReportType.Article)
                 {
-                    var review = await _context.Reviews.FindAsync(report.TargetId);
-                    if (review != null) _context.Reviews.Remove(review);
+                    var article = await _context.Articles.FindAsync(report.TargetId);
+                    if (article != null)
+                    {
+                        contentAuthorId = article.AuthorId;
+                        contentLabel = "Twój artykuł";
+                        _context.Articles.Remove(article);
+                    }
+                }
+
+                // Powiadomienie dla autora usuniętej treści
+                if (contentAuthorId.HasValue)
+                {
+                    _context.UserNotifications.Add(new UserNotification
+                    {
+                        UserId = contentAuthorId.Value,
+                        Type = NotificationType.ContentRemoved,
+                        Message = $"{contentLabel} została usunięta przez moderację.",
+                        Reason = string.IsNullOrWhiteSpace(deleteReason) ? "Naruszenie regulaminu." : deleteReason
+                    });
                 }
 
                 TempData["SuccessMessage"] = "Treść została pomyślnie usunięta, a zgłoszenie zamknięte.";
@@ -211,11 +272,97 @@ namespace GameWiki.Controllers
                 TempData["SuccessMessage"] = "Zgłoszenie zostało odrzucone.";
             }
 
-            // Oznaczamy zgłoszenie jako załatwione
             report.Status = ReportStatus.Resolved;
             await _context.SaveChangesAsync();
 
             return RedirectToAction(nameof(Reports));
+        }
+        public async Task<IActionResult> PendingReviews()
+        {
+            var reviews = await _context.Reviews
+                .Where(r => !r.IsVerified && !string.IsNullOrEmpty(r.Content))
+                .Include(r => r.User)
+                .Include(r => r.Game)
+                .OrderBy(r => r.CreatedAt)
+                .ToListAsync();
+
+            return View(reviews);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> VerifyReview(int reviewId)
+        {
+            var review = await _context.Reviews.FindAsync(reviewId);
+            if (review == null) return NotFound();
+
+            review.IsVerified = true;
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "Recenzja została zweryfikowana.";
+            return RedirectToAction(nameof(PendingReviews));
+        }
+        // --- PANEL ODWOŁAŃ ---
+        public async Task<IActionResult> Appeals()
+        {
+            var appeals = await _context.Appeals
+                .Include(a => a.User)
+                .Where(a => a.Status == AppealStatus.Pending) // Pokazuj tylko nierozpatrzone
+                .OrderBy(a => a.CreatedAt)
+                .ToListAsync();
+
+            return View(appeals);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> HandleAppeal(int appealId, string actionType)
+        {
+            var appeal = await _context.Appeals
+                .Include(a => a.User)
+                .FirstOrDefaultAsync(a => a.Id == appealId);
+
+            if (appeal == null) return NotFound();
+
+            if (actionType == "approve")
+            {
+                appeal.Status = AppealStatus.Approved;
+
+                // 1. AUTOMATYCZNE ODBANOWANIE (jeśli odwołanie dotyczyło blokady konta)
+                if (appeal.User != null && appeal.User.IsBanned)
+                {
+                    appeal.User.IsBanned = false;
+
+                    // Wysyłamy powiadomienie o pomyślnym odbanowaniu
+                    var notification = new UserNotification
+                    {
+                        UserId = appeal.UserId,
+                        Message = "Twoje odwołanie zostało rozpatrzone pozytywnie. Twoje konto zostało odblokowane!",
+                        Type = NotificationType.Unban,
+                        Reason = "Zatwierdzenie zgłoszenia apelacyjnego przez administrację."
+                    };
+                    _context.UserNotifications.Add(notification);
+                }
+
+                TempData["SuccessMessage"] = $"Odwołanie użytkownika {appeal.User?.Username} zostało zaakceptowane. Konto zostało pomyślnie odbanowane.";
+            }
+            else if (actionType == "reject")
+            {
+                appeal.Status = AppealStatus.Rejected;
+
+                // 2. POWIADOMIENIE O ODRZUCENIU APELACJI
+                var notification = new UserNotification
+                {
+                    UserId = appeal.UserId,
+                    Message = "Twoje odwołanie od decyzji moderacji zostało odrzucone po ponownej weryfikacji.",
+                    Type = NotificationType.ContentRemoved, // Używamy typu generycznego dla powiadomień systemowych
+                    Reason = "Decyzja podtrzymana przez Administratora. Brak podstaw do zmiany werdyktu."
+                };
+                _context.UserNotifications.Add(notification);
+
+                TempData["SuccessMessage"] = $"Odwołanie użytkownika {appeal.User?.Username} zostało odrzucone.";
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction(nameof(Appeals));
         }
     }
 }

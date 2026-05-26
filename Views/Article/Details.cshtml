@@ -77,25 +77,60 @@
             }
         }
 
-        @* ── AKCJE ── *@
         <div style="display:flex; gap:0.8rem; margin-top:2rem; flex-wrap:wrap;">
             @if (User.IsInRole("Admin") || User.IsInRole("Moderator") || Model.AuthorId == currentUserId)
             {
                 <a asp-action="Edit" asp-route-id="@Model.Id" class="gw-btn-primary">✏️ Edytuj</a>
-                <form asp-action="Delete" asp-route-id="@Model.Id" method="post" style="margin:0;"
-                      onsubmit="return confirm('Na pewno usunąć artykuł?');">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="gw-btn-outline" style="color:#f87171; border-color:#f87171;">🗑️ Usuń</button>
-                </form>
+
+                @if ((User.IsInRole("Admin") || User.IsInRole("Moderator")) && Model.AuthorId != currentUserId)
+                {
+                    @* Mod usuwa cudzy artykuł — modal z powodem *@
+                    <button type="button" class="gw-btn-outline" style="color:#f87171; border-color:#f87171;"
+                            data-bs-toggle="modal" data-bs-target="#deleteArticleModal">
+                        🗑️ Usuń
+                    </button>
+
+                    <div class="modal fade" id="deleteArticleModal" tabindex="-1">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content" style="background:#1a1d26; border:1px solid rgba(255,255,255,0.1);">
+                                <div class="modal-header border-secondary">
+                                    <h5 class="modal-title text-white">Usuń artykuł</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form asp-action="Delete" asp-route-id="@Model.Id" method="post">
+                                    @Html.AntiForgeryToken()
+                                    <div class="modal-body">
+                                        <p class="text-secondary small mb-3">Autor otrzyma powiadomienie. Tej operacji nie można cofnąć.</p>
+                                        <label class="form-label text-light">Powód usunięcia (wyświetlony autorowi)</label>
+                                        <textarea name="deleteReason" class="form-control" rows="3"
+                                          style="background:#0f1117; color:#e2e8f0; border-color:#334155;"
+                                          placeholder="np. Naruszenie regulaminu, dezinformacja..."></textarea>
+                                    </div>
+                                    <div class="modal-footer border-secondary">
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                        <button type="submit" class="btn btn-danger">Usuń artykuł</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    @* Właściciel lub mod usuwa własny artykuł — bez powodu *@
+                    <form asp-action="Delete" asp-route-id="@Model.Id" method="post" style="margin:0;"
+                          onsubmit="return confirm('Na pewno usunąć artykuł?');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="gw-btn-outline" style="color:#f87171; border-color:#f87171;">🗑️ Usuń</button>
+                    </form>
+                }
             }
             <a asp-action="Index" asp-route-gameId="@Model.GameId" class="gw-btn-outline">← Wróć</a>
             @if (User.Identity?.IsAuthenticated == true && Model.AuthorId.ToString() != User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)
             {
                 <button type="button" class="btn btn-sm btn-outline-warning ms-3 rounded-pill"
-                        data-bs-toggle="modal"
-                        data-bs-target="#reportModal"
-                        data-report-type="Article"
-                        data-report-targetid="@Model.Id">
+                        data-bs-toggle="modal" data-bs-target="#reportModal"
+                        data-report-type="Article" data-report-targetid="@Model.Id">
                     🚩 Zgłoś artykuł
                 </button>
             }

@@ -50,7 +50,7 @@
                         {
                             <div class="p-3 mb-4 rounded" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05);">
                                 <span class="text-muted small">
-                                    Autor zablokowanej treści: <strong class="text-info">@report.ContentAuthorName</strong>
+                                    Autor treści: <strong class="text-info">@report.ContentAuthorName</strong>
                                 </span>
                                 <p class="text-light mt-2 mb-0">@report.ContentText</p>
                             </div>
@@ -68,13 +68,42 @@
                                 <button type="submit" class="btn btn-outline-secondary btn-sm">Zignoruj zgłoszenie</button>
                             </form>
 
-                            @if (report.Type == GameWiki.Models.ReportType.Comment || report.Type == GameWiki.Models.ReportType.Review)
+                            @if (report.Type == GameWiki.Models.ReportType.Comment ||
+                                                report.Type == GameWiki.Models.ReportType.Review ||
+                                                report.Type == GameWiki.Models.ReportType.Article)
                             {
-                                <form asp-action="HandleReport" method="post" class="m-0">
-                                    <input type="hidden" name="reportId" value="@report.ReportId" />
-                                    <input type="hidden" name="actionType" value="delete" />
-                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Na pewno usunąć tę treść? To działanie jest nieodwracalne.');">Usuń treść</button>
-                                </form>
+                                <button type="button" class="btn btn-danger btn-sm"
+                                        data-bs-toggle="modal" data-bs-target="#deleteModal-@report.ReportId">
+                                    Usuń treść
+                                </button>
+
+                                <div class="modal fade" id="deleteModal-@report.ReportId" tabindex="-1">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content" style="background: #1a1d26; border: 1px solid rgba(255,255,255,0.1);">
+                                            <div class="modal-header border-secondary">
+                                                <h5 class="modal-title text-white">
+                                                    @(report.Type == GameWiki.Models.ReportType.Article ? "Usuń artykuł" : $"Usuń treść użytkownika {report.ContentAuthorName}")
+                                                </h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form asp-action="HandleReport" method="post">
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="reportId" value="@report.ReportId" />
+                                                    <input type="hidden" name="actionType" value="delete" />
+                                                    <p class="text-secondary small mb-3">Użytkownik otrzyma powiadomienie z podanym powodem. Tej operacji nie można cofnąć.</p>
+                                                    <label class="form-label text-light">Powód usunięcia (wyświetlony użytkownikowi)</label>
+                                                    <textarea name="deleteReason" class="form-control" rows="3"
+                                                  style="background: #0f1117; color: #e2e8f0; border-color: #334155;"
+                                                  placeholder="np. Wulgaryzmy, spam, treści niezgodne z regulaminem..."></textarea>
+                                                </div>
+                                                <div class="modal-footer border-secondary">
+                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                                    <button type="submit" class="btn btn-danger">Usuń treść</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             }
                         </div>
                     </div>

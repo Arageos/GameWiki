@@ -1,0 +1,72 @@
+﻿@model IEnumerable<GameWiki.Models.Review>
+@{
+    ViewData["Title"] = "Recenzje do weryfikacji";
+}
+
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-white fw-bold">⭐ Recenzje do weryfikacji</h2>
+            <p style="color:#64748b; margin:0; font-size:0.88rem;">Recenzje z treścią tekstową oczekujące na weryfikację</p>
+        </div>
+        <a asp-controller="Admin" asp-action="Index" class="btn btn-outline-light">← Panel admina</a>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-4">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="gw-card text-center p-5" style="background:#1a1d26; border-radius:15px; border:1px solid rgba(255,255,255,0.1);">
+            <div style="font-size:3rem; margin-bottom:1rem;">✅</div>
+            <p class="text-secondary">Brak recenzji oczekujących na weryfikację.</p>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex flex-column gap-3">
+            @foreach (var review in Model)
+            {
+                <div class="gw-card p-4" style="background:#1a1d26; border-radius:12px; border:1px solid rgba(255,255,255,0.1);">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <span class="fw-bold text-white">@review.User?.Username</span>
+                            <span class="text-secondary mx-2">·</span>
+                            <span class="text-info">@review.Game?.Title</span>
+                            <span class="text-secondary mx-2">·</span>
+                            <span style="color:#f59e0b;">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    @(i <= review.Rating ? "★" : "☆")
+                                }
+                                (@review.Rating/5)
+                            </span>
+                        </div>
+                        <small class="text-secondary">@review.CreatedAt.ToString("dd.MM.yyyy HH:mm")</small>
+                    </div>
+
+                    <p class="text-light mb-4" style="font-style:italic; border-left:3px solid #6366f1; padding-left:1rem;">
+                        "@review.Content"
+                    </p>
+
+                    <div class="d-flex gap-2">
+                        <form asp-action="VerifyReview" method="post" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="reviewId" value="@review.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-success">✅ Zweryfikuj</button>
+                        </form>
+                        <a asp-controller="Reviews" asp-action="Index" asp-route-gameId="@review.GameId"
+                           class="btn btn-sm btn-outline-secondary">
+                            👁️ Zobacz recenzje gry
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

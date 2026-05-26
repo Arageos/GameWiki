@@ -1,0 +1,144 @@
+﻿@model IEnumerable<GameWiki.Models.UserNotification>
+@{
+    ViewData["Title"] = "Moje Powiadomienia";
+}
+
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-white fw-bold">🔔 Powiadomienia</h2>
+        @if (Model.Any(n => !n.IsRead))
+        {
+            <form asp-action="MarkAllRead" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                    Oznacz wszystkie jako przeczytane
+                </button>
+            </form>
+        }
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="gw-card p-5 text-center" style="background: #1a1d26; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
+            <p class="text-secondary fs-5 mb-0">Nie masz żadnych powiadomień.</p>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex flex-column gap-3">
+            @foreach (var n in Model)
+            {
+                var (icon, borderColor, bgColor) = n.Type switch
+                {
+                    GameWiki.Models.NotificationType.Ban =>
+                    ("🚫", "#ef4444", "rgba(239,68,68,0.07)"),
+                    GameWiki.Models.NotificationType.Unban =>
+                    ("✅", "#22c55e", "rgba(34,197,94,0.07)"),
+                    GameWiki.Models.NotificationType.ContentRemoved =>
+                    ("🗑️", "#f59e0b", "rgba(245,158,11,0.07)"),
+                    _ => ("ℹ️", "#6366f1", "rgba(99,102,241,0.07)")
+                };
+
+                <div class="p-4 rounded-3 @(n.IsRead ? "" : "fw-semibold")"
+                     style="background: @bgColor; border: 1px solid @borderColor; border-left: 4px solid @borderColor; opacity: @(n.IsRead ? "0.65" : "1");">
+
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="me-2 fs-5">@icon</span>
+                            <span class="text-white">@n.Message</span>
+                            @if (!n.IsRead)
+                            {
+                                <span class="badge ms-2" style="background: @borderColor; font-size: 0.65rem;">NOWE</span>
+                            }
+                        </div>
+                        <small class="text-secondary ms-3 text-nowrap">
+                            @n.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                        </small>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(n.Reason))
+                    {
+                        <div class="mt-2 ms-4 ps-2 border-start border-secondary">
+                            <small class="text-secondary">Powód: </small>
+                            <small class="text-light">@n.Reason</small>
+                        </div>
+                    }
+
+                    <div class="d-flex gap-2 mt-3 ms-4">
+                        <form asp-action="DeleteNotification" asp-controller="Account" method="post" class="m-0">
+                            <input type="hidden" name="id" value="@n.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Na pewno chcesz usunąć to powiadomienie?');">🗑️ Usuń</button>
+                        </form>
+
+                        @if (n.Type == GameWiki.Models.NotificationType.ContentRemoved)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-info"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#appealModal"
+                                    data-appeal-subject="Odwołanie: @(n.Type == GameWiki.Models.NotificationType.Ban ? "Blokada konta" : "Usunięcie treści")">
+                                ⚖️ Odwołaj się
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="modal fade" id="appealModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-light border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-info">⚖️ Napisz odwołanie</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form asp-controller="Reports" asp-action="CreateAppeal" method="post">
+                    <div class="modal-body">
+                        <input type="hidden" name="returnUrl" value="/Account/Notifications" />
+                        <input type="hidden" name="subject" id="appealSubject" value="" />
+
+                        <p class="small text-muted mb-3">Opisz szczegółowo, dlaczego uważasz, że decyzja moderacji była błędna.</p>
+
+                        <div class="mb-3">
+                            <label class="form-label text-uppercase small fw-bold" style="color: #94a3b8;">Treść odwołania:</label>
+                            <textarea name="message" class="form-control bg-dark text-light border-secondary" rows="5" required maxlength="1000"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-outline-light rounded-pill" data-bs-dismiss="modal">Anuluj</button>
+                        <button type="submit" class="btn btn-info rounded-pill">Wyślij odwołanie</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var appealModal = document.getElementById('appealModal');
+            if (appealModal) {
+                appealModal.addEventListener('show.bs.modal', function (event) {
+                    var button = event.relatedTarget;
+                    var subject = button.getAttribute('data-appeal-subject');
+                    appealModal.querySelector('#appealSubject').value = subject;
+                });
+            }
+        });
+    </script>
+</div>

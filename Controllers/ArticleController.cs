@@ -270,7 +270,7 @@ namespace GameWiki.Controllers
         [HttpPost]
         [Authorize]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(int id, string? deleteReason)
         {
             var article = await _context.Articles.FindAsync(id);
             if (article == null) return NotFound();
@@ -278,6 +278,22 @@ namespace GameWiki.Controllers
             var userId = GetCurrentUserId();
             bool isMod = User.IsInRole("Admin") || User.IsInRole("Moderator");
             if (!isMod && article.AuthorId != userId) return Forbid();
+
+            if (isMod && article.AuthorId != userId)
+            {
+                _context.UserNotifications.Add(new UserNotification
+                {
+                    UserId = article.AuthorId,
+                    Type = NotificationType.ContentRemoved,
+                    Message = "Twój artykuł został usunięty przez moderację.",
+                    Reason = string.IsNullOrWhiteSpace(deleteReason) ? "Naruszenie regulaminu." : deleteReason
+                });
+            }
+
+            var relatedReports = await _context.Reports
+                .Where(r => r.Type == ReportType.Article && r.TargetId == id && r.Status == ReportStatus.Pending)
+                .ToListAsync();
+            foreach (var r in relatedReports) r.Status = ReportStatus.Resolved;
 
             _context.Articles.Remove(article);
             await _context.SaveChangesAsync();
@@ -306,10 +322,23 @@ namespace GameWiki.Controllers
         [HttpPost]
         [Authorize(Roles = "Admin,Moderator")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Reject(int id)
+        public async Task<IActionResult> Reject(int id, string? deleteReason)
         {
             var article = await _context.Articles.FindAsync(id);
             if (article == null) return NotFound();
+
+            _context.UserNotifications.Add(new UserNotification
+            {
+                UserId = article.AuthorId,
+                Type = NotificationType.ContentRemoved,
+                Message = "Twój artykuł został odrzucony przez moderację.",
+                Reason = string.IsNullOrWhiteSpace(deleteReason) ? "Artykuł nie spełnia wymagań serwisu." : deleteReason
+            });
+
+            var relatedReports = await _context.Reports
+                .Where(r => r.Type == ReportType.Article && r.TargetId == id && r.Status == ReportStatus.Pending)
+                .ToListAsync();
+            foreach (var r in relatedReports) r.Status = ReportStatus.Resolved;
 
             _context.Articles.Remove(article);
             await _context.SaveChangesAsync();
@@ -350,7 +379,7 @@ namespace GameWiki.Controllers
         [HttpPost]
         [Authorize]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteComment(int commentId, int articleId)
+        public async Task<IActionResult> DeleteComment(int commentId, int articleId, string? deleteReason)
         {
             var comment = await _context.Comments.FindAsync(commentId);
             if (comment == null) return NotFound();
@@ -358,6 +387,22 @@ namespace GameWiki.Controllers
             var userId = GetCurrentUserId();
             bool isMod = User.IsInRole("Admin") || User.IsInRole("Moderator");
             if (!isMod && comment.UserId != userId) return Forbid();
+
+            if (isMod && comment.UserId != userId)
+            {
+                _context.UserNotifications.Add(new UserNotification
+                {
+                    UserId = comment.UserId,
+                    Type = NotificationType.ContentRemoved,
+                    Message = "Twój komentarz został usunięty przez moderację.",
+                    Reason = string.IsNullOrWhiteSpace(deleteReason) ? "Naruszenie regulaminu." : deleteReason
+                });
+            }
+
+            var relatedReports = await _context.Reports
+                .Where(r => r.Type == ReportType.Comment && r.TargetId == commentId && r.Status == ReportStatus.Pending)
+                .ToListAsync();
+            foreach (var r in relatedReports) r.Status = ReportStatus.Resolved;
 
             _context.Comments.Remove(comment);
             await _context.SaveChangesAsync();

@@ -38,7 +38,22 @@ app.UseRouting();
 
 app.UseAuthentication(); // MUSI byæ przed UseAuthorization
 app.UseAuthorization();
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        var userIdClaim = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+        {
+            var db = context.RequestServices.GetRequiredService<GameWikiDbContext>();
+            var count = await db.UserNotifications
+                .CountAsync(n => n.UserId == userId && !n.IsRead);
 
+            context.Items["UnreadNotificationsCount"] = count;
+        }
+    }
+    await next();
+});
 app.MapStaticAssets();
 
 app.MapControllerRoute(

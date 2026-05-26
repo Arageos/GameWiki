@@ -31,6 +31,8 @@ public class GameWikiDbContext : DbContext
     public DbSet<Image> Images { get; set; }
     public DbSet<Report> Reports { get; set; }
     public DbSet<ModNotification> ModNotifications { get; set; }
+    public DbSet<UserNotification> UserNotifications { get; set; }
+    public DbSet<Appeal> Appeals { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -153,5 +155,11 @@ public class GameWikiDbContext : DbContext
             .WithMany()
             .HasForeignKey(i => i.ArticleBlockId)
             .OnDelete(DeleteBehavior.NoAction);
+        // UserNotification
+        modelBuilder.Entity<UserNotification>()
+            .HasOne(n => n.User)
+            .WithMany(u => u.Notifications)
+            .HasForeignKey(n => n.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

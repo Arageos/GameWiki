@@ -165,7 +165,7 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(Index), new { gameId = review.GameId });
         }
 
-        
+
         [HttpPost]
         [Authorize]
         [ValidateAntiForgeryToken]
@@ -177,6 +177,12 @@ namespace GameWiki.Controllers
                 .FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId);
 
             if (review == null) return NotFound();
+
+            var relatedReports = await _context.Reports
+                .Where(r => r.Type == ReportType.Review && r.TargetId == id && r.Status == ReportStatus.Pending)
+                .ToListAsync();
+            foreach (var r in relatedReports)
+                r.Status = ReportStatus.Resolved;
 
             var gameId = review.GameId;
             _context.Reviews.Remove(review);

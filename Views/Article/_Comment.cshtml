@@ -33,19 +33,60 @@
                 <span style="color:#475569; font-size:0.78rem;">@Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")</span>
             </div>
 
-            @* Usuń *@
             @if (canDelete)
             {
-                <form asp-controller="Article" asp-action="DeleteComment" method="post" style="margin:0;"
-                      onsubmit="return confirm('Usunąć komentarz?');">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="commentId" value="@Model.Id" />
-                    <input type="hidden" name="articleId" value="@articleId" />
-                    <button type="submit" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.78rem;padding:0;transition:color 0.2s;"
-                            onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#64748b'">
+                bool modDeletingOther = (User.IsInRole("Admin") || User.IsInRole("Moderator")) && Model.UserId != currentUserId;
+
+                @if (modDeletingOther)
+                {
+                    <button type="button"
+                            style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.78rem;padding:0;"
+                            onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#64748b'"
+                            data-bs-toggle="modal" data-bs-target="#deleteCommentModal-@Model.Id">
                         🗑️ Usuń
                     </button>
-                </form>
+
+                    <div class="modal fade" id="deleteCommentModal-@Model.Id" tabindex="-1">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content" style="background:#1a1d26; border:1px solid rgba(255,255,255,0.1);">
+                                <div class="modal-header border-secondary">
+                                    <h5 class="modal-title text-white">Usuń komentarz</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form asp-controller="Article" asp-action="DeleteComment" method="post">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="commentId" value="@Model.Id" />
+                                    <input type="hidden" name="articleId" value="@articleId" />
+                                    <div class="modal-body">
+                                        <p class="text-secondary small mb-3">Użytkownik <strong class="text-info">@Model.User?.Username</strong> otrzyma powiadomienie.</p>
+                                        <label class="form-label text-light">Powód usunięcia</label>
+                                        <textarea name="deleteReason" class="form-control" rows="2"
+                                          style="background:#0f1117; color:#e2e8f0; border-color:#334155;"
+                                          placeholder="np. Wulgaryzmy, spam..."></textarea>
+                                    </div>
+                                    <div class="modal-footer border-secondary">
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                        <button type="submit" class="btn btn-danger">Usuń</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <form asp-controller="Article" asp-action="DeleteComment" method="post" style="margin:0;"
+                          onsubmit="return confirm('Usunąć komentarz?');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="commentId" value="@Model.Id" />
+                        <input type="hidden" name="articleId" value="@articleId" />
+                        <button type="submit"
+                                style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.78rem;padding:0;"
+                                onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='#64748b'">
+                            🗑️ Usuń
+                        </button>
+                    </form>
+                }
             }
         </div>
 
