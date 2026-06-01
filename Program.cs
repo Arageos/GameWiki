@@ -24,6 +24,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddHttpClient<RawgService>();
 builder.Services.AddScoped<GameService>();
+builder.Services.AddScoped<ArticleService>();
 
 var app = builder.Build();
 

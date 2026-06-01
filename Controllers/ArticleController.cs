@@ -1,112 +1,66 @@
-﻿using GameWiki.Models;
-using GameWiki.DTOs.Article;
+﻿using GameWiki.DTOs.Article;
+using GameWiki.Models;
+using GameWiki.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace GameWiki.Controllers
 {
     public class ArticleController : Controller
     {
-        private readonly GameWikiDbContext _context;
-        private readonly IWebHostEnvironment _env;
+        private readonly ArticleService _articleService;
 
-        public ArticleController(GameWikiDbContext context, IWebHostEnvironment env)
+        public ArticleController(ArticleService articleService)
         {
-            _context = context;
-            _env = env;
+            _articleService = articleService;
         }
 
-        // ─── GLOBALNA LISTA ARTYKUŁÓW (opcjonalny filtr po grze) ──────────────────
+        // ── LISTA ARTYKUŁÓW ──────────────────────────────────────────────
 
         public async Task<IActionResult> Index(int? gameId, string? gameSearch)
         {
+            var (articles, selectedGameTitle) = await _articleService.GetArticlesAsync(gameId, gameSearch);
+
             ViewBag.SelectedGameId = gameId;
             ViewBag.GameSearch = gameSearch;
-
-            var query = _context.Articles
-                .Include(a => a.Author)
-                .Include(a => a.Game)
-                .AsQueryable();
-
-            if (gameId.HasValue)
-            {
-                query = query.Where(a => a.GameId == gameId.Value);
-                ViewBag.SelectedGameTitle = await _context.Games
-                    .Where(g => g.Id == gameId.Value)
-                    .Select(g => g.Title)
-                    .FirstOrDefaultAsync();
-            }
-            else if (!string.IsNullOrWhiteSpace(gameSearch))
-            {
-                query = query.Where(a => a.Game.Title.Contains(gameSearch));
-            }
-
-            var articles = await query.OrderByDescending(a => a.CreatedAt).ToListAsync();
+            ViewBag.SelectedGameTitle = selectedGameTitle;
 
             return View(articles);
         }
 
+        // ── AUTOCOMPLETE ─────────────────────────────────────────────────
+
         [HttpGet]
         public async Task<IActionResult> SearchGames(string q)
         {
-            if (string.IsNullOrWhiteSpace(q))
-                return Json(new List<object>());
-
-            var games = await _context.Games
-                .Where(g => g.Title.Contains(q))
-                .OrderBy(g => g.Title)
-                .Take(8)
-                .Select(g => new { g.Id, g.Title })
-                .ToListAsync();
-
-            return Json(games);
+            var results = await _articleService.SearchGamesAsync(q);
+            return Json(results);
         }
 
-        // ─── SZCZEGÓŁY ARTYKUŁU ────────────────────────────────────────────────────
+        // ── SZCZEGÓŁY ────────────────────────────────────────────────────
 
         public async Task<IActionResult> Details(int id)
         {
-            var article = await _context.Articles
-                .Include(a => a.Game)
-                .Include(a => a.Author)
-                .Include(a => a.Blocks.OrderBy(b => b.Order))
-                .FirstOrDefaultAsync(a => a.Id == id);
-
+            var article = await _articleService.GetArticleWithDetailsAsync(id);
             if (article == null) return NotFound();
 
-            var allComments = await _context.Comments
-                .Where(c => c.ArticleId == id)
-                .Include(c => c.User)
-                .Include(c => c.Reactions)
-                .OrderBy(c => c.CreatedAt)
-                .ToListAsync();
-
+            var allComments = await _articleService.GetArticleCommentsAsync(id);
             ViewBag.AllComments = allComments;
 
             var currentUserId = GetCurrentUserId();
-            if (currentUserId.HasValue)
-            {
-                ViewBag.MyReactions = await _context.CommentReactions
-                    .Where(r => r.UserId == currentUserId.Value &&
-                                allComments.Select(c => c.Id).Contains(r.CommentId))
-                    .ToListAsync();
-            }
-            else
-            {
-                ViewBag.MyReactions = new List<CommentReaction>();
-            }
+            ViewBag.MyReactions = currentUserId.HasValue
+                ? await _articleService.GetUserReactionsAsync(currentUserId.Value, allComments.Select(c => c.Id).ToList())
+                : new List<CommentReaction>();
 
             return View(article);
         }
 
-        // ─── TWORZENIE ARTYKUŁU ────────────────────────────────────────────────────
+        // ── TWORZENIE ────────────────────────────────────────────────────
 
         [Authorize]
-        public async Task<IActionResult> Create(int? gameId)
+        public IActionResult Create(int? gameId)
         {
-            ViewBag.Games = await _context.Games.OrderBy(g => g.Title).ToListAsync();
             return View(new CreateArticleDto { GameId = gameId ?? 0 });
         }
 
@@ -116,61 +70,14 @@ namespace GameWiki.Controllers
         public async Task<IActionResult> Create(CreateArticleDto dto)
         {
             if (!ModelState.IsValid)
-            {
-                ViewBag.Games = await _context.Games.OrderBy(g => g.Title).ToListAsync();
                 return View(dto);
-            }
 
             var userId = GetCurrentUserId();
             if (!userId.HasValue) return Unauthorized();
 
             bool isMod = User.IsInRole("Admin") || User.IsInRole("Moderator");
 
-            var article = new Article
-            {
-                GameId = dto.GameId,
-                AuthorId = userId.Value,
-                Title = dto.Title,
-                IsVerified = isMod,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            if (dto.CoverImage != null && dto.CoverImage.Length > 0)
-                article.CoverImageUrl = await SaveImageAsync(dto.CoverImage);
-
-            _context.Articles.Add(article);
-            await _context.SaveChangesAsync();
-
-            if (dto.Blocks != null)
-            {
-                int order = 0;
-                foreach (var blockDto in dto.Blocks)
-                {
-                    if (blockDto.Type == ArticleBlockType.Text && !string.IsNullOrWhiteSpace(blockDto.TextContent))
-                    {
-                        _context.ArticleBlocks.Add(new ArticleBlock
-                        {
-                            ArticleId = article.Id,
-                            Type = ArticleBlockType.Text,
-                            Content = blockDto.TextContent,
-                            Order = order++
-                        });
-                    }
-                    else if (blockDto.Type == ArticleBlockType.Image && blockDto.ImageFile != null && blockDto.ImageFile.Length > 0)
-                    {
-                        var url = await SaveImageAsync(blockDto.ImageFile);
-                        _context.ArticleBlocks.Add(new ArticleBlock
-                        {
-                            ArticleId = article.Id,
-                            Type = ArticleBlockType.Image,
-                            Content = url,
-                            Order = order++
-                        });
-                    }
-                }
-            }
-
-            await _context.SaveChangesAsync();
+            await _articleService.CreateArticleAsync(dto, userId.Value, isMod);
 
             TempData["SuccessMessage"] = isMod
                 ? "Artykuł został opublikowany."
@@ -179,22 +86,16 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // ─── EDYCJA ARTYKUŁU ───────────────────────────────────────────────────────
+        // ── EDYCJA ───────────────────────────────────────────────────────
 
         [Authorize]
         public async Task<IActionResult> Edit(int id)
         {
-            var article = await _context.Articles
-                .Include(a => a.Blocks.OrderBy(b => b.Order))
-                .FirstOrDefaultAsync(a => a.Id == id);
-
+            var article = await _articleService.GetArticleForEditAsync(id);
             if (article == null) return NotFound();
 
-            var userId = GetCurrentUserId();
-            bool isMod = User.IsInRole("Admin") || User.IsInRole("Moderator");
-            if (!isMod && article.AuthorId != userId) return Forbid();
+            if (!CanModify(article.AuthorId)) return Forbid();
 
-            ViewBag.Games = await _context.Games.OrderBy(g => g.Title).ToListAsync();
             return View(article);
         }
 
@@ -203,117 +104,44 @@ namespace GameWiki.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, EditArticleDto dto)
         {
-            var article = await _context.Articles
-                .Include(a => a.Blocks)
-                .FirstOrDefaultAsync(a => a.Id == id);
-
+            var article = await _articleService.GetArticleForEditAsync(id);
             if (article == null) return NotFound();
 
-            var userId = GetCurrentUserId();
-            bool isMod = User.IsInRole("Admin") || User.IsInRole("Moderator");
-            if (!isMod && article.AuthorId != userId) return Forbid();
+            if (!CanModify(article.AuthorId)) return Forbid();
 
-            article.Title = dto.Title;
-            article.UpdatedAt = DateTime.UtcNow;
+            await _articleService.UpdateArticleAsync(article, dto);
 
-            if (dto.CoverImage != null && dto.CoverImage.Length > 0)
-                article.CoverImageUrl = await SaveImageAsync(dto.CoverImage);
-
-            _context.ArticleBlocks.RemoveRange(article.Blocks);
-
-            if (dto.Blocks != null)
-            {
-                int order = 0;
-                foreach (var blockDto in dto.Blocks)
-                {
-                    if (blockDto.Type == ArticleBlockType.Text && !string.IsNullOrWhiteSpace(blockDto.TextContent))
-                    {
-                        _context.ArticleBlocks.Add(new ArticleBlock
-                        {
-                            ArticleId = article.Id,
-                            Type = ArticleBlockType.Text,
-                            Content = blockDto.TextContent,
-                            Order = order++
-                        });
-                    }
-                    else if (blockDto.Type == ArticleBlockType.Image && blockDto.ImageFile != null && blockDto.ImageFile.Length > 0)
-                    {
-                        var url = await SaveImageAsync(blockDto.ImageFile);
-                        _context.ArticleBlocks.Add(new ArticleBlock
-                        {
-                            ArticleId = article.Id,
-                            Type = ArticleBlockType.Image,
-                            Content = url,
-                            Order = order++
-                        });
-                    }
-                    else if (blockDto.Type == ArticleBlockType.Image && !string.IsNullOrWhiteSpace(blockDto.ExistingImageUrl))
-                    {
-                        _context.ArticleBlocks.Add(new ArticleBlock
-                        {
-                            ArticleId = article.Id,
-                            Type = ArticleBlockType.Image,
-                            Content = blockDto.ExistingImageUrl,
-                            Order = order++
-                        });
-                    }
-                }
-            }
-
-            await _context.SaveChangesAsync();
             TempData["SuccessMessage"] = "Artykuł został zaktualizowany.";
             return RedirectToAction(nameof(Details), new { id });
         }
 
-        // ─── USUWANIE ARTYKUŁU ─────────────────────────────────────────────────────
+        // ── USUWANIE ─────────────────────────────────────────────────────
 
         [HttpPost]
         [Authorize]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id, string? deleteReason)
         {
-            var article = await _context.Articles.FindAsync(id);
+            var article = await _articleService.GetArticleForEditAsync(id);
             if (article == null) return NotFound();
 
-            var userId = GetCurrentUserId();
-            bool isMod = User.IsInRole("Admin") || User.IsInRole("Moderator");
-            if (!isMod && article.AuthorId != userId) return Forbid();
+            if (!CanModify(article.AuthorId)) return Forbid();
 
-            if (isMod && article.AuthorId != userId)
-            {
-                _context.UserNotifications.Add(new UserNotification
-                {
-                    UserId = article.AuthorId,
-                    Type = NotificationType.ContentRemoved,
-                    Message = "Twój artykuł został usunięty przez moderację.",
-                    Reason = string.IsNullOrWhiteSpace(deleteReason) ? "Naruszenie regulaminu." : deleteReason
-                });
-            }
-
-            var relatedReports = await _context.Reports
-                .Where(r => r.Type == ReportType.Article && r.TargetId == id && r.Status == ReportStatus.Pending)
-                .ToListAsync();
-            foreach (var r in relatedReports) r.Status = ReportStatus.Resolved;
-
-            _context.Articles.Remove(article);
-            await _context.SaveChangesAsync();
+            await _articleService.DeleteArticleAsync(article, GetCurrentUserId(), deleteReason);
 
             TempData["SuccessMessage"] = "Artykuł został usunięty.";
             return RedirectToAction(nameof(Index));
         }
 
-        // ─── MODERACJA ─────────────────────────────────────────────────────────────
+        // ── MODERACJA ────────────────────────────────────────────────────
 
         [HttpPost]
         [Authorize(Roles = "Admin,Moderator")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Verify(int id)
         {
-            var article = await _context.Articles.FindAsync(id);
+            var article = await _articleService.VerifyArticleAsync(id);
             if (article == null) return NotFound();
-
-            article.IsVerified = true;
-            await _context.SaveChangesAsync();
 
             TempData["SuccessMessage"] = "Artykuł został zatwierdzony.";
             return RedirectToAction("PendingArticles", "Admin");
@@ -324,30 +152,14 @@ namespace GameWiki.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Reject(int id, string? deleteReason)
         {
-            var article = await _context.Articles.FindAsync(id);
+            var article = await _articleService.RejectArticleAsync(id, deleteReason);
             if (article == null) return NotFound();
-
-            _context.UserNotifications.Add(new UserNotification
-            {
-                UserId = article.AuthorId,
-                Type = NotificationType.ContentRemoved,
-                Message = "Twój artykuł został odrzucony przez moderację.",
-                Reason = string.IsNullOrWhiteSpace(deleteReason) ? "Artykuł nie spełnia wymagań serwisu." : deleteReason
-            });
-
-            var relatedReports = await _context.Reports
-                .Where(r => r.Type == ReportType.Article && r.TargetId == id && r.Status == ReportStatus.Pending)
-                .ToListAsync();
-            foreach (var r in relatedReports) r.Status = ReportStatus.Resolved;
-
-            _context.Articles.Remove(article);
-            await _context.SaveChangesAsync();
 
             TempData["SuccessMessage"] = "Artykuł został odrzucony i usunięty.";
             return RedirectToAction("PendingArticles", "Admin");
         }
 
-        // ─── KOMENTARZE ────────────────────────────────────────────────────────────
+        // ── KOMENTARZE ───────────────────────────────────────────────────
 
         [HttpPost]
         [Authorize]
@@ -363,16 +175,7 @@ namespace GameWiki.Controllers
             var userId = GetCurrentUserId();
             if (!userId.HasValue) return Unauthorized();
 
-            _context.Comments.Add(new Comment
-            {
-                ArticleId = articleId,
-                UserId = userId.Value,
-                Content = content.Trim(),
-                CreatedAt = DateTime.UtcNow,
-                ParentCommentId = parentCommentId
-            });
-
-            await _context.SaveChangesAsync();
+            await _articleService.AddCommentAsync(articleId, userId.Value, content, parentCommentId);
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
@@ -381,35 +184,16 @@ namespace GameWiki.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteComment(int commentId, int articleId, string? deleteReason)
         {
-            var comment = await _context.Comments.FindAsync(commentId);
+            var comment = await _articleService.GetCommentAsync(commentId);
             if (comment == null) return NotFound();
 
-            var userId = GetCurrentUserId();
-            bool isMod = User.IsInRole("Admin") || User.IsInRole("Moderator");
-            if (!isMod && comment.UserId != userId) return Forbid();
+            if (!CanModify(comment.UserId)) return Forbid();
 
-            if (isMod && comment.UserId != userId)
-            {
-                _context.UserNotifications.Add(new UserNotification
-                {
-                    UserId = comment.UserId,
-                    Type = NotificationType.ContentRemoved,
-                    Message = "Twój komentarz został usunięty przez moderację.",
-                    Reason = string.IsNullOrWhiteSpace(deleteReason) ? "Naruszenie regulaminu." : deleteReason
-                });
-            }
-
-            var relatedReports = await _context.Reports
-                .Where(r => r.Type == ReportType.Comment && r.TargetId == commentId && r.Status == ReportStatus.Pending)
-                .ToListAsync();
-            foreach (var r in relatedReports) r.Status = ReportStatus.Resolved;
-
-            _context.Comments.Remove(comment);
-            await _context.SaveChangesAsync();
+            await _articleService.DeleteCommentAsync(comment, GetCurrentUserId(), deleteReason);
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
-        // ─── REAKCJE ───────────────────────────────────────────────────────────────
+        // ── REAKCJE ──────────────────────────────────────────────────────
 
         [HttpPost]
         [Authorize]
@@ -419,32 +203,11 @@ namespace GameWiki.Controllers
             var userId = GetCurrentUserId();
             if (!userId.HasValue) return Unauthorized();
 
-            var existing = await _context.CommentReactions
-                .FirstOrDefaultAsync(r => r.CommentId == commentId && r.UserId == userId.Value);
-
-            if (existing == null)
-            {
-                _context.CommentReactions.Add(new CommentReaction
-                {
-                    CommentId = commentId,
-                    UserId = userId.Value,
-                    Type = type
-                });
-            }
-            else if (existing.Type == type)
-            {
-                _context.CommentReactions.Remove(existing);
-            }
-            else
-            {
-                existing.Type = type;
-            }
-
-            await _context.SaveChangesAsync();
+            await _articleService.ReactAsync(commentId, userId.Value, type);
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
-        // ─── HELPERS ───────────────────────────────────────────────────────────────
+        // ── PRYWATNE HELPERY ─────────────────────────────────────────────
 
         private int? GetCurrentUserId()
         {
@@ -452,15 +215,10 @@ namespace GameWiki.Controllers
             return int.TryParse(val, out int id) ? id : null;
         }
 
-        private async Task<string> SaveImageAsync(IFormFile file)
+        private bool CanModify(int ownerId)
         {
-            var uploads = Path.Combine(_env.WebRootPath, "uploads", "articles");
-            Directory.CreateDirectory(uploads);
-            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-            var filePath = Path.Combine(uploads, fileName);
-            using var stream = new FileStream(filePath, FileMode.Create);
-            await file.CopyToAsync(stream);
-            return $"/uploads/articles/{fileName}";
+            if (User.IsInRole("Admin") || User.IsInRole("Moderator")) return true;
+            return GetCurrentUserId() == ownerId;
         }
     }
 }

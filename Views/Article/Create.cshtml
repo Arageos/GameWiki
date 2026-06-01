@@ -1,8 +1,6 @@
 ﻿@model GameWiki.DTOs.Article.CreateArticleDto
-@using GameWiki.Models
 @{
     ViewData["Title"] = "Nowy artykuł";
-    var games = ViewBag.Games as List<Game> ?? new List<Game>();
 }
 
 <div class="gw-auth-wrapper">
@@ -24,16 +22,25 @@
         <form asp-action="Create" method="post" enctype="multipart/form-data" id="articleForm">
             @Html.AntiForgeryToken()
 
-            @* Gra *@
+            @* Gra — autocomplete *@
             <div class="gw-form-group">
                 <label class="gw-label">Gra</label>
-                <select name="GameId" class="gw-input" required>
-                    <option value="">— wybierz grę —</option>
-                    @foreach (var g in games)
-                    {
-                        <option value="@g.Id" selected="@(Model.GameId == g.Id)">@g.Title</option>
-                    }
-                </select>
+                <div style="position:relative;">
+                    <input id="gameSearchInput"
+                           type="text"
+                           placeholder="Wpisz tytuł gry..."
+                           autocomplete="off"
+                           class="gw-input"
+                           required />
+                    <input type="hidden" name="GameId" id="gameIdHidden" value="@Model.GameId" />
+                    <ul id="gameSearchDropdown"
+                        style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0;
+                               background:#1e1e2e; border:1px solid rgba(255,255,255,0.12); border-radius:12px;
+                               list-style:none; margin:0; padding:0.3rem 0; z-index:999;
+                               box-shadow:0 8px 24px rgba(0,0,0,0.4); overflow:hidden;">
+                    </ul>
+                </div>
+                <span id="gameError" style="color:#f87171; font-size:0.82rem; display:none;">Musisz wybrać grę z listy.</span>
             </div>
 
             @* Tytuł *@
@@ -83,72 +90,185 @@
 </div>
 
 @section Scripts {
-<script>
-    let blockIndex = 0;
+    <script>
+        // ── AUTOCOMPLETE ──
+        const input = document.getElementById('gameSearchInput');
+        const dropdown = document.getElementById('gameSearchDropdown');
+        const hiddenId = document.getElementById('gameIdHidden');
+        const gameError = document.getElementById('gameError');
+        let debounceTimer = null;
 
-    function addTextBlock() {
-        const i = blockIndex++;
-        const container = document.getElementById('blocksContainer');
-        const div = document.createElement('div');
-        div.className = 'gw-block-item';
-        div.style.cssText = 'background:rgba(15,17,23,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:1rem;position:relative;';
-        div.innerHTML = `
-            <input type="hidden" name="Blocks[${i}].Type" value="0" />
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                <span style="font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">📝 Tekst</span>
-                <button type="button" onclick="removeBlock(this)" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;">✕</button>
-            </div>
-            <textarea name="Blocks[${i}].TextContent" class="gw-input" rows="5"
-                      placeholder="Treść bloku..." style="resize:vertical;margin:0;"></textarea>
-        `;
-        container.appendChild(div);
-    }
+        input.addEventListener('input', function () {
+            const query = this.value.trim();
 
-    function addImageBlock() {
-        const i = blockIndex++;
-        const container = document.getElementById('blocksContainer');
-        const div = document.createElement('div');
-        div.className = 'gw-block-item';
-        div.style.cssText = 'background:rgba(15,17,23,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:1rem;position:relative;';
-        div.innerHTML = `
-            <input type="hidden" name="Blocks[${i}].Type" value="1" />
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                <span style="font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">🖼️ Zdjęcie</span>
-                <button type="button" onclick="removeBlock(this)" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;">✕</button>
-            </div>
-            <input type="file" name="Blocks[${i}].ImageFile" accept="image/*" class="gw-input"
-                   style="padding:0.45rem 0.75rem;" onchange="previewBlockImage(this)" />
-            <div class="block-preview" style="display:none;margin-top:0.5rem;">
-                <img src="" alt="Podgląd" style="max-height:140px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);" />
-            </div>
-        `;
-        container.appendChild(div);
-    }
+            // Gdy użytkownik edytuje tekst, resetuj ukryty GameId (musi wybrać z listy)
+            hiddenId.value = '';
 
-    function removeBlock(btn) {
-        btn.closest('.gw-block-item').remove();
-    }
+            if (query.length < 2) {
+                hideDropdown();
+                return;
+            }
 
-    function previewBlockImage(input) {
-        const preview = input.parentElement.querySelector('.block-preview');
-        const img = preview.querySelector('img');
-        if (input.files && input.files[0]) {
-            img.src = URL.createObjectURL(input.files[0]);
-            preview.style.display = 'block';
+            debounceTimer = setTimeout(() => fetchSuggestions(query), 250);
+        });
+
+        async function fetchSuggestions(query) {
+            try {
+                const res = await fetch(`/Article/SearchGames?q=${encodeURIComponent(query)}`);
+                const games = await res.json();
+
+                if (!games.length) {
+                    hideDropdown();
+                    return;
+                }
+
+                dropdown.innerHTML = '';
+                games.forEach(game => {
+                    const li = document.createElement('li');
+                    li.textContent = game.title;
+                    li.style.cssText = `
+                        padding: 0.5rem 1rem;
+                        cursor: pointer;
+                        font-size: 0.85rem;
+                        color: #e2e8f0;
+                        transition: background 0.15s;
+                    `;
+                    li.addEventListener('mouseenter', () => li.style.background = 'rgba(99,102,241,0.2)');
+                    li.addEventListener('mouseleave', () => li.style.background = 'transparent');
+                    li.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        selectGame(game.id, game.title);
+                    });
+                    dropdown.appendChild(li);
+                });
+
+                dropdown.style.display = 'block';
+            } catch (e) {
+                hideDropdown();
+            }
         }
-    }
 
-    // Podgląd zdjęcia tytułowego
-    document.getElementById('coverInput').addEventListener('change', function () {
-        const preview = document.getElementById('coverPreview');
-        const img = document.getElementById('coverPreviewImg');
-        if (this.files && this.files[0]) {
-            img.src = URL.createObjectURL(this.files[0]);
-            preview.style.display = 'block';
+        function selectGame(id, title) {
+            hiddenId.value = id;
+            input.value = title;
+            gameError.style.display = 'none';
+            hideDropdown();
         }
-    });
 
-    // Zacznij od jednego pustego bloku tekstowego
-    addTextBlock();
-</script>
+        function hideDropdown() {
+            dropdown.style.display = 'none';
+            dropdown.innerHTML = '';
+        }
+
+        // Zamknij dropdown przy kliknięciu gdziekolwiek indziej
+        document.addEventListener('click', function (e) {
+            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                hideDropdown();
+            }
+        });
+
+        // Nawigacja klawiaturą (strzałki + Enter)
+        let activeIndex = -1;
+        input.addEventListener('keydown', function (e) {
+            const items = dropdown.querySelectorAll('li');
+            if (!items.length) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                activeIndex = Math.min(activeIndex + 1, items.length - 1);
+                updateActive(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                activeIndex = Math.max(activeIndex - 1, -1);
+                updateActive(items);
+            } else if (e.key === 'Enter' && activeIndex >= 0) {
+                e.preventDefault();
+                const games = JSON.parse(dropdown.dataset.games || '[]');
+                items[activeIndex].dispatchEvent(new Event('mousedown'));
+            }
+        });
+
+        function updateActive(items) {
+            items.forEach((li, i) => {
+                li.style.background = i === activeIndex ? 'rgba(99,102,241,0.2)' : 'transparent';
+            });
+        }
+
+        // Walidacja przed submitem — GameId musi być ustawione
+        document.getElementById('articleForm').addEventListener('submit', function (e) {
+            if (!hiddenId.value) {
+                e.preventDefault();
+                gameError.style.display = 'block';
+                input.focus();
+            }
+        });
+
+        // ── BLOKI TREŚCI ──
+        let blockIndex = 0;
+
+        function addTextBlock() {
+            const i = blockIndex++;
+            const container = document.getElementById('blocksContainer');
+            const div = document.createElement('div');
+            div.className = 'gw-block-item';
+            div.style.cssText = 'background:rgba(15,17,23,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:1rem;position:relative;';
+            div.innerHTML = `
+                <input type="hidden" name="Blocks[${i}].Type" value="0" />
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                    <span style="font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">📝 Tekst</span>
+                    <button type="button" onclick="removeBlock(this)" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+                </div>
+                <textarea name="Blocks[${i}].TextContent" class="gw-input" rows="5"
+                          placeholder="Treść bloku..." style="resize:vertical;margin:0;"></textarea>
+            `;
+            container.appendChild(div);
+        }
+
+        function addImageBlock() {
+            const i = blockIndex++;
+            const container = document.getElementById('blocksContainer');
+            const div = document.createElement('div');
+            div.className = 'gw-block-item';
+            div.style.cssText = 'background:rgba(15,17,23,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:1rem;position:relative;';
+            div.innerHTML = `
+                <input type="hidden" name="Blocks[${i}].Type" value="1" />
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                    <span style="font-size:0.78rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">🖼️ Zdjęcie</span>
+                    <button type="button" onclick="removeBlock(this)" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+                </div>
+                <input type="file" name="Blocks[${i}].ImageFile" accept="image/*" class="gw-input"
+                       style="padding:0.45rem 0.75rem;" onchange="previewBlockImage(this)" />
+                <div class="block-preview" style="display:none;margin-top:0.5rem;">
+                    <img src="" alt="Podgląd" style="max-height:140px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);" />
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function removeBlock(btn) {
+            btn.closest('.gw-block-item').remove();
+        }
+
+        function previewBlockImage(input) {
+            const preview = input.parentElement.querySelector('.block-preview');
+            const img = preview.querySelector('img');
+            if (input.files && input.files[0]) {
+                img.src = URL.createObjectURL(input.files[0]);
+                preview.style.display = 'block';
+            }
+        }
+
+        // Podgląd zdjęcia tytułowego
+        document.getElementById('coverInput').addEventListener('change', function () {
+            const preview = document.getElementById('coverPreview');
+            const img = document.getElementById('coverPreviewImg');
+            if (this.files && this.files[0]) {
+                img.src = URL.createObjectURL(this.files[0]);
+                preview.style.display = 'block';
+            }
+        });
+
+        // Zacznij od jednego pustego bloku tekstowego
+        addTextBlock();
+    </script>
 }

@@ -1,26 +1,29 @@
-﻿using GameWiki.Models;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using GameWiki.Models;
 
-public class Game
+namespace GameWiki.Models
 {
-    public int Id { get; set; }
+    public class Game
+    {
+        public int Id { get; set; }
 
-    [Required]
-    [MaxLength(150)]
-    public string Title { get; set; }
+        [Required]
+        [MaxLength(150)]
+        public string Title { get; set; }
 
-    [Required]
-    [MaxLength(10000)]
-    public string Description { get; set; }
+        [Required]
+        [MaxLength(10000)]
+        public string Description { get; set; }
 
-    public DateTime ReleaseDate { get; set; }
-    public DateTime AddedAt { get; set; } = DateTime.UtcNow;
+        public DateTime ReleaseDate { get; set; }
+        public DateTime AddedAt { get; set; } = DateTime.UtcNow;
 
-    public string? BackgroundImage { get; set; }
-    public double? RawgRating { get; set; }
-    public int? RawgRatingsCount { get; set; }
+        public string? BackgroundImage { get; set; }
+        public double? RawgRating { get; set; }
+        public int? RawgRatingsCount { get; set; }
 
-    public ICollection<GameGenre> GameGenres { get; set; }
-    public ICollection<GamePlatform> GamePlatforms { get; set; }
-    public ICollection<Review> Reviews { get; set; } = new List<Review>();
+        public ICollection<GameGenre> GameGenres { get; set; }
+        public ICollection<GamePlatform> GamePlatforms { get; set; }
+        public ICollection<Review> Reviews { get; set; } = new List<Review>();
+    }
 }
