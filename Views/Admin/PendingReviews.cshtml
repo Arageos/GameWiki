@@ -1,4 +1,4 @@
-﻿@model IEnumerable<GameWiki.Models.Review>
+@model IEnumerable<GameWiki.Models.Review>
 @{
     ViewData["Title"] = "Recenzje do weryfikacji";
 }
@@ -9,7 +9,7 @@
             <h2 class="text-white fw-bold">⭐ Recenzje do weryfikacji</h2>
             <p style="color:#64748b; margin:0; font-size:0.88rem;">Recenzje z treścią tekstową oczekujące na weryfikację</p>
         </div>
-        <a asp-controller="Admin" asp-action="Index" class="btn btn-outline-light">← Panel admina</a>
+        <a asp-controller="Admin" asp-action="Index" class="gw-btn-outline" style="font-size:0.88rem;">← Panel admina</a>
     </div>
 
     @if (TempData["SuccessMessage"] != null)
@@ -22,48 +22,91 @@
 
     @if (!Model.Any())
     {
-        <div class="gw-card text-center p-5" style="background:#1a1d26; border-radius:15px; border:1px solid rgba(255,255,255,0.1);">
+        <div class="gw-auth-card" style="text-align:center; padding:3rem;">
             <div style="font-size:3rem; margin-bottom:1rem;">✅</div>
-            <p class="text-secondary">Brak recenzji oczekujących na weryfikację.</p>
+            <p style="color:#94a3b8;">Brak recenzji oczekujących na weryfikację.</p>
         </div>
     }
     else
     {
-        <div class="d-flex flex-column gap-3">
+        <div style="display:flex; flex-direction:column; gap:1rem;">
             @foreach (var review in Model)
             {
-                <div class="gw-card p-4" style="background:#1a1d26; border-radius:12px; border:1px solid rgba(255,255,255,0.1);">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                            <span class="fw-bold text-white">@review.User?.Username</span>
-                            <span class="text-secondary mx-2">·</span>
-                            <span class="text-info">@review.Game?.Title</span>
-                            <span class="text-secondary mx-2">·</span>
-                            <span style="color:#f59e0b;">
-                                @for (int i = 1; i <= 5; i++)
-                                {
-                                    @(i <= review.Rating ? "★" : "☆")
-                                }
-                                (@review.Rating/5)
-                            </span>
-                        </div>
-                        <small class="text-secondary">@review.CreatedAt.ToString("dd.MM.yyyy HH:mm")</small>
+                <div class="gw-card" style="display:flex; gap:1.2rem; padding:1.2rem; align-items:flex-start;
+                            background:#1a1d26; border-radius:12px; border:1px solid rgba(255,255,255,0.1);">
+
+                    <div style="width:110px; height:70px; border-radius:8px; flex-shrink:0;
+                                background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.25);
+                                display:flex; align-items:center; justify-content:center; font-size:1.8rem;">
+                        ⭐
                     </div>
 
-                    <p class="text-light mb-4" style="font-style:italic; border-left:3px solid #6366f1; padding-left:1rem;">
-                        "@review.Content"
-                    </p>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:1rem; font-weight:700; color:#e2e8f0; margin-bottom:0.3rem;">
+                            @review.Game?.Title
+                            <span class="badge bg-warning text-dark ms-2" style="font-size:0.68rem; vertical-align:middle;">Niezweryfikowana</span>
+                        </div>
 
-                    <div class="d-flex gap-2">
-                        <form asp-action="VerifyReview" method="post" class="m-0">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="reviewId" value="@review.Id" />
-                            <button type="submit" class="btn btn-sm btn-outline-success">✅ Zweryfikuj</button>
-                        </form>
+                        <div style="display:flex; gap:1rem; font-size:0.8rem; color:#64748b; flex-wrap:wrap; margin-bottom:0.5rem;">
+                            <span>👤 @review.User?.Username</span>
+                            <span style="color:#f59e0b;">
+                                @for (int i = 1; i <= 5; i++) { @(i <= review.Rating ? "★" : "☆") }
+                                (@review.Rating/5)
+                            </span>
+                            <span>🕐 @DateTime.SpecifyKind(review.CreatedAt, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(review.Content))
+                        {
+                            <p class="text-light mb-0" style="font-size:0.88rem; font-style:italic;
+                               border-left:3px solid #6366f1; padding-left:0.8rem; color:#94a3b8 !important;">
+                                „@(review.Content.Length > 200 ? review.Content.Substring(0, 200) + "…" : review.Content)"
+                            </p>
+                        }
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:0.5rem; flex-shrink:0;">
                         <a asp-controller="Reviews" asp-action="Index" asp-route-gameId="@review.GameId"
                            class="btn btn-sm btn-outline-secondary">
-                            👁️ Zobacz recenzje gry
+                            👁️ Podgląd
                         </a>
+                        <form asp-action="VerifyReview" method="post" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="reviewId" value="@review.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-success w-100">✅ Zatwierdź</button>
+                        </form>
+                        <button type="button" class="btn btn-sm btn-outline-danger w-100"
+                                data-bs-toggle="modal" data-bs-target="#rejectModal-@review.Id">
+                            ❌ Odrzuć
+                        </button>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="rejectModal-@review.Id" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content" style="background:#1a1d26; border:1px solid rgba(255,255,255,0.1);">
+                            <div class="modal-header border-secondary">
+                                <h5 class="modal-title text-white">Odrzuć recenzję</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form asp-action="DeleteReview" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="reviewId" value="@review.Id" />
+                                <div class="modal-body">
+                                    <p class="text-secondary small mb-3">
+                                        Autor <strong class="text-info">@review.User?.Username</strong> otrzyma powiadomienie z podanym powodem.
+                                    </p>
+                                    <label class="form-label text-light">Powód odrzucenia</label>
+                                    <textarea name="deleteReason" class="form-control" rows="3"
+                                              style="background:#0f1117; color:#e2e8f0; border-color:#334155;"
+                                              placeholder="np. Treść niezgodna z regulaminem, spam..."></textarea>
+                                </div>
+                                <div class="modal-footer border-secondary">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                    <button type="submit" class="btn btn-danger">Odrzuć i usuń</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             }

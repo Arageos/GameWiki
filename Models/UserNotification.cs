@@ -1,6 +1,16 @@
 ﻿namespace GameWiki.Models
 {
-    public enum NotificationType { Ban, Unban, ContentRemoved }
+    public enum NotificationType
+    {
+        Ban,
+        Unban,
+        ContentRemoved,
+        NewArticle,
+        NewReview,
+        NewReport,
+        NewGame,
+        ContentEdited
+    }
 
     public class UserNotification
     {
@@ -10,7 +20,8 @@
         public NotificationType Type { get; set; }
         public string Message { get; set; }
         public string? Reason { get; set; }
+        public string? ActionUrl { get; set; }
         public bool IsRead { get; set; } = false;
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

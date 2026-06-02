@@ -46,7 +46,6 @@
         </div>
     }
 
-    @* ── FILTR PO GRZE Z AUTOCOMPLETE ── *@
     <div style="margin-bottom:1.5rem;">
         <form id="gameSearchForm" asp-action="Index" method="get"
               style="display:flex; gap:0.5rem; align-items:center; max-width:420px;">
@@ -82,7 +81,6 @@
         </form>
     </div>
 
-    @* ── LISTA ARTYKUŁÓW ── *@
     @if (!Model.Any())
     {
         <div class="gw-auth-card" style="text-align:center; padding:3rem;">
@@ -115,7 +113,6 @@
             @foreach (var article in Model)
             {
                 <div class="gw-card" style="display:flex; gap:1.2rem; padding:1.2rem; align-items:flex-start;">
-                    @* Miniatura *@
                     <a asp-action="Details" asp-route-id="@article.Id" style="flex-shrink:0;">
                         @if (!string.IsNullOrEmpty(article.CoverImageUrl))
                         {
@@ -132,14 +129,23 @@
                         }
                     </a>
 
-                    @* Treść *@
                     <div style="flex:1; min-width:0;">
-                        <a asp-action="Details" asp-route-id="@article.Id"
-                           style="font-size:1.05rem; font-weight:700; color:#e2e8f0; text-decoration:none; display:block; margin-bottom:0.35rem;">
-                            @article.Title
+                        <a asp-action="Details" asp-route-id="@article.Id" style="display:flex; flex-wrap:wrap; align-items:center; gap:0.5rem; text-decoration:none; margin-bottom:0.35rem;">
+                            <span style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">@article.Title</span>
+
                             @if (!article.IsVerified)
                             {
-                                <span class="badge bg-warning text-dark ms-2" style="font-size:0.68rem; vertical-align:middle;">Niezweryfikowany</span>
+                                <span class="badge bg-warning text-dark" style="font-size:0.68rem; padding:0.25rem 0.5rem; display:flex; align-items:center; height:fit-content;">Niezweryfikowany</span>
+                            }
+
+                            @{
+                                var roleName = article.Author?.UserRoles?.FirstOrDefault()?.Role?.Name;
+                                if (roleName == "Admin" || roleName == "Moderator")
+                                {
+                                    var badgeClass = roleName == "Admin" ? "nav-badge-admin" : "nav-badge-mod";
+                                    var shortRole = roleName == "Moderator" ? "MOD" : "ADMIN";
+                                    <span class="@badgeClass" style="font-size:0.65rem; padding:0.25rem 0.5rem; border-radius:4px; display:flex; align-items:center; height:fit-content;">@shortRole</span>
+                                }
                             }
                         </a>
                         <div style="display:flex; gap:1rem; font-size:0.8rem; color:#64748b; flex-wrap:wrap;">
@@ -152,7 +158,6 @@
                         </div>
                     </div>
 
-                    @* Akcje mod *@
                     @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
                     {
                         <div style="display:flex; gap:0.5rem; flex-shrink:0; align-items:center;">
@@ -217,7 +222,7 @@
                     li.addEventListener('mouseenter', () => li.style.background = 'rgba(99,102,241,0.2)');
                     li.addEventListener('mouseleave', () => li.style.background = 'transparent');
                     li.addEventListener('mousedown', (e) => {
-                        e.preventDefault(); // żeby nie odpalił blur na inpucie przed kliknięciem
+                        e.preventDefault();
                         input.value = game.title;
                         hideDropdown();
                         form.submit();
@@ -236,14 +241,12 @@
             dropdown.innerHTML = '';
         }
 
-        // Zamknij dropdown przy kliknięciu gdziekolwiek indziej
         document.addEventListener('click', function (e) {
             if (!input.contains(e.target) && !dropdown.contains(e.target)) {
                 hideDropdown();
             }
         });
 
-        // Nawigacja klawiaturą (strzałki + Enter)
         let activeIndex = -1;
         input.addEventListener('keydown', function (e) {
             const items = dropdown.querySelectorAll('li');

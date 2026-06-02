@@ -8,8 +8,6 @@
         public int TargetId { get; set; }
         public string Reason { get; set; }
         public DateTime CreatedAt { get; set; }
-
-        // Pola specyficzne dla recenzji i komentarzy
         public string ContentAuthorName { get; set; }
         public string ContentText { get; set; }
     }

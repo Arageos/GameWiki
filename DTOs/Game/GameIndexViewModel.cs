@@ -10,7 +10,6 @@ namespace GameWiki.DTOs.Game
         public string? Search { get; set; }
         public int? GenreId { get; set; }
         public int? PlatformId { get; set; }
-        public bool IsFiltered =>
-            !string.IsNullOrEmpty(Search) || GenreId.HasValue || PlatformId.HasValue;
+        public bool IsFiltered => !string.IsNullOrEmpty(Search) || GenreId.HasValue || PlatformId.HasValue;
     }
 }

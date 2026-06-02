@@ -16,8 +16,6 @@ namespace GameWiki.Controllers
             _articleService = articleService;
         }
 
-        // ── LISTA ARTYKUŁÓW ──────────────────────────────────────────────
-
         public async Task<IActionResult> Index(int? gameId, string? gameSearch)
         {
             var (articles, selectedGameTitle) = await _articleService.GetArticlesAsync(gameId, gameSearch);
@@ -29,16 +27,12 @@ namespace GameWiki.Controllers
             return View(articles);
         }
 
-        // ── AUTOCOMPLETE ─────────────────────────────────────────────────
-
         [HttpGet]
         public async Task<IActionResult> SearchGames(string q)
         {
             var results = await _articleService.SearchGamesAsync(q);
             return Json(results);
         }
-
-        // ── SZCZEGÓŁY ────────────────────────────────────────────────────
 
         public async Task<IActionResult> Details(int id)
         {
@@ -55,8 +49,6 @@ namespace GameWiki.Controllers
 
             return View(article);
         }
-
-        // ── TWORZENIE ────────────────────────────────────────────────────
 
         [Authorize]
         public IActionResult Create(int? gameId)
@@ -86,8 +78,6 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // ── EDYCJA ───────────────────────────────────────────────────────
-
         [Authorize]
         public async Task<IActionResult> Edit(int id)
         {
@@ -109,13 +99,13 @@ namespace GameWiki.Controllers
 
             if (!CanModify(article.AuthorId)) return Forbid();
 
-            await _articleService.UpdateArticleAsync(article, dto);
+            var editorId = GetCurrentUserId()!.Value;
+
+            await _articleService.UpdateArticleWithNotificationAsync(article, dto, editorId);
 
             TempData["SuccessMessage"] = "Artykuł został zaktualizowany.";
             return RedirectToAction(nameof(Details), new { id });
         }
-
-        // ── USUWANIE ─────────────────────────────────────────────────────
 
         [HttpPost]
         [Authorize]
@@ -132,8 +122,6 @@ namespace GameWiki.Controllers
             TempData["SuccessMessage"] = "Artykuł został usunięty.";
             return RedirectToAction(nameof(Index));
         }
-
-        // ── MODERACJA ────────────────────────────────────────────────────
 
         [HttpPost]
         [Authorize(Roles = "Admin,Moderator")]
@@ -159,8 +147,6 @@ namespace GameWiki.Controllers
             return RedirectToAction("PendingArticles", "Admin");
         }
 
-        // ── KOMENTARZE ───────────────────────────────────────────────────
-
         [HttpPost]
         [Authorize]
         [ValidateAntiForgeryToken]
@@ -179,6 +165,44 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
+        [Authorize]
+        public async Task<IActionResult> EditComment(int commentId)
+        {
+            var comment = await _articleService.GetCommentAsync(commentId);
+            if (comment == null) return NotFound();
+
+            if (!CanModify(comment.UserId)) return Forbid();
+
+            ViewBag.ArticleId = comment.ArticleId;
+            ViewBag.IsModEdit = (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+                                && comment.UserId != GetCurrentUserId();
+            ViewBag.OriginalAuthor = comment.User?.Username;
+            return View(comment);
+        }
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditComment(int commentId, int articleId, string content)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                TempData["ErrorMessage"] = "Komentarz nie może być pusty.";
+                return RedirectToAction(nameof(Details), new { id = articleId });
+            }
+
+            var comment = await _articleService.GetCommentAsync(commentId);
+            if (comment == null) return NotFound();
+
+            if (!CanModify(comment.UserId)) return Forbid();
+
+            var editorId = GetCurrentUserId()!.Value;
+            await _articleService.UpdateCommentAsync(comment, content, editorId);
+
+            TempData["SuccessMessage"] = "Komentarz został zaktualizowany.";
+            return RedirectToAction(nameof(Details), new { id = articleId });
+        }
+
         [HttpPost]
         [Authorize]
         [ValidateAntiForgeryToken]
@@ -193,8 +217,6 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
 
-        // ── REAKCJE ──────────────────────────────────────────────────────
-
         [HttpPost]
         [Authorize]
         [ValidateAntiForgeryToken]
@@ -206,8 +228,6 @@ namespace GameWiki.Controllers
             await _articleService.ReactAsync(commentId, userId.Value, type);
             return RedirectToAction(nameof(Details), new { id = articleId });
         }
-
-        // ── PRYWATNE HELPERY ─────────────────────────────────────────────
 
         private int? GetCurrentUserId()
         {

@@ -3,7 +3,6 @@
     ViewData["Title"] = "Strona główna";
     var featuredGames = ViewBag.FeaturedGames as IEnumerable<dynamic>;
     var genres = ViewBag.Genres as List<Genre>;
-
     var genreIcons = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
         ["Action"] = "⚔️",
@@ -29,7 +28,6 @@
     };
 }
 
-<!-- HERO -->
 <div class="gw-hero">
     <div class="gw-hero-content">
         <div class="gw-hero-badge">🎮 Encyklopedia Gier</div>
@@ -67,7 +65,6 @@
         </div>
     </div>
 
-    <!-- MOZAIKA OKŁADEK -->
     <div class="gw-hero-visual">
         <div class="gw-mosaic">
             @if (featuredGames != null)
@@ -91,7 +88,6 @@
     </div>
 </div>
 
-<!-- GATUNKI -->
 <section class="gw-section">
     <div class="gw-section-header">
         <h2 class="gw-section-title">Przeglądaj według gatunku</h2>
@@ -114,7 +110,6 @@
     </div>
 </section>
 
-<!-- FEATURES -->
 <section class="gw-section gw-features-section">
     <div class="gw-section-header">
         <h2 class="gw-section-title">Dlaczego GameWiki?</h2>
@@ -144,7 +139,6 @@
     </div>
 </section>
 
-<!-- CTA -->
 @if (!User.Identity.IsAuthenticated)
 {
     <section class="gw-cta-section">

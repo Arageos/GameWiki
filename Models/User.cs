@@ -24,5 +24,6 @@ namespace GameWiki.Models
         public ICollection<FavoriteList> FavoriteLists { get; set; }
         public bool IsBanned { get; set; } = false;
         public ICollection<UserNotification> Notifications { get; set; }
+        public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     }
 }

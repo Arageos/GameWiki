@@ -1,4 +1,5 @@
 ﻿using GameWiki.Models;
+using GameWiki.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -6,14 +7,16 @@ using System.Security.Claims;
 
 namespace GameWiki.Controllers
 {
-    [Authorize] // Tylko zalogowani mogą zgłaszać
+    [Authorize]
     public class ReportsController : Controller
     {
         private readonly GameWikiDbContext _context;
+        private readonly ArticleService _articleService;
 
-        public ReportsController(GameWikiDbContext context)
+        public ReportsController(GameWikiDbContext context, ArticleService articleService)
         {
             _context = context;
+            _articleService = articleService;
         }
 
         [HttpPost]
@@ -28,29 +31,29 @@ namespace GameWiki.Controllers
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!int.TryParse(userIdStr, out int userId)) return RedirectToAction("Login", "Account");
 
-            // 1. Zapisujemy zgłoszenie
             var report = new Report
             {
                 ReporterId = userId,
                 Type = type,
                 TargetId = targetId,
-                Reason = reason
+                Reason = reason,
+                CreatedAt = DateTime.UtcNow
             };
             _context.Reports.Add(report);
-
-            // 2. Tworzymy powiadomienie "Dzwoneczek" dla administracji
-            var notification = new ModNotification
-            {
-                Message = $"Nowe zgłoszenie ({type}) od użytkownika {User.Identity?.Name}.",
-                ActionUrl = "/Admin/Reports" // Ten widok stworzymy w Etapie 4
-            };
-            _context.ModNotifications.Add(notification);
-
             await _context.SaveChangesAsync();
 
-            TempData["SuccessMessage"] = "Zgłoszenie zostało wysłane do administracji. Dziękujemy za reakcję!";
+            // Powiadom wszystkich Admin/Mod przez UserNotification (widoczne w dzwonku)
+            await _articleService.NotifyModsAsync(
+                NotificationType.NewReport,
+                $"Nowe zgłoszenie ({type}) od użytkownika {User.Identity?.Name}: {reason.Substring(0, Math.Min(reason.Length, 60))}{(reason.Length > 60 ? "…" : "")}",
+                "/Admin/Reports"
+            );
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "Zgłoszenie zostało wysłane do administracji. Dziękujemy!";
             return Redirect(returnUrl ?? "/");
         }
+
         [HttpPost]
         [AllowAnonymous]
         public async Task<IActionResult> AppealBan(string email, string message)
@@ -66,12 +69,12 @@ namespace GameWiki.Controllers
             };
             _context.Appeals.Add(appeal);
 
-            var notification = new ModNotification
-            {
-                Message = $"Nowe odwołanie od zbanowanego użytkownika {user.Username}.",
-                ActionUrl = "/Admin/Appeals"
-            };
-            _context.ModNotifications.Add(notification);
+            // Powiadom moderatorów
+            await _articleService.NotifyModsAsync(
+                NotificationType.NewReport,
+                $"Nowe odwołanie od zbanowanego użytkownika {user.Username}.",
+                "/Admin/Appeals"
+            );
 
             await _context.SaveChangesAsync();
 
@@ -97,16 +100,13 @@ namespace GameWiki.Controllers
                 Subject = subject ?? "Odwołanie od decyzji administracji",
                 Message = message
             };
-
             _context.Appeals.Add(appeal);
 
-            // Dzwoneczek dla administracji
-            var notification = new ModNotification
-            {
-                Message = $"Nowe odwołanie od użytkownika {User.Identity?.Name}.",
-                ActionUrl = "/Admin/Appeals" // Tym panelem zajmiemy się w kolejnym etapie
-            };
-            _context.ModNotifications.Add(notification);
+            await _articleService.NotifyModsAsync(
+                NotificationType.NewReport,
+                $"Nowe odwołanie od użytkownika {User.Identity?.Name}.",
+                "/Admin/Appeals"
+            );
 
             await _context.SaveChangesAsync();
 

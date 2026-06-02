@@ -1,12 +1,12 @@
-﻿@using GameWiki.DTOs.Review
+@using GameWiki.DTOs.Review
 @model List<ReviewDto>
 @{
     ViewData["Title"] = "Recenzje — " + ViewBag.GameTitle;
     int gameId = (int)ViewBag.GameId;
+    bool isMod = User.IsInRole("Admin") || User.IsInRole("Moderator");
 }
 
 <div class="gw-section">
-
     @if (!string.IsNullOrEmpty((string?)ViewBag.BackgroundImage))
     {
         <div class="gw-details-banner"
@@ -22,13 +22,9 @@
     {
         <div class="gw-section-header" style="text-align:left; margin-bottom:2rem;">
             <h1 class="gw-section-title">⭐ Recenzje — @ViewBag.GameTitle</h1>
-
-
-            <div class="gw-profile-avatar-large">
-                @(ViewBag.GameTitle != null ? ViewBag.GameTitle.ToString()[0].ToString().ToUpper() : "🎮")
-            </div>
         </div>
     }
+
     @if (TempData["SuccessMessage"] != null)
     {
         <div class="alert alert-success alert-dismissible fade show mt-3">
@@ -43,6 +39,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
+
     <div style="display:flex; gap:0.8rem; margin-bottom:2rem; flex-wrap:wrap;">
         @if (User.Identity?.IsAuthenticated == true)
         {
@@ -66,13 +63,13 @@
         <div class="gw-reviews-grid">
             @foreach (var review in Model)
             {
+                bool isModCard = isMod && !review.IsOwner;
+
                 <div class="gw-review-card">
                     <div class="gw-review-header">
                         @if (!string.IsNullOrWhiteSpace(review.AvatarUrl))
                         {
-                            <img src="@review.AvatarUrl"
-                                 class="gw-review-avatar"
-                                 alt="@review.Username" />
+                            <img src="@review.AvatarUrl" class="gw-review-avatar" alt="@review.Username" />
                         }
                         else
                         {
@@ -80,10 +77,24 @@
                                 @(review.Username?.Substring(0, 1).ToUpper() ?? "U")
                             </div>
                         }
+
                         <div class="gw-review-meta">
-                            <span class="gw-review-username">@review.Username</span>
-                            <span class="gw-review-date">@review.CreatedAt.ToString("dd.MM.yyyy")</span>
+                            <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+                                <span class="gw-review-username">@review.Username</span>
+                                @{
+                                    if (review.AuthorRoleName == "Admin" || review.AuthorRoleName == "Moderator")
+                                    {
+                                        var badgeClass = review.AuthorRoleName == "Admin" ? "nav-badge-admin" : "nav-badge-mod";
+                                        var shortRole  = review.AuthorRoleName == "Admin" ? "ADMIN" : "MOD";
+                                        <span class="@badgeClass" style="font-size:0.6rem;">@shortRole</span>
+                                    }
+                                }
+                            </div>
+                            <span class="gw-review-date">
+                                @DateTime.SpecifyKind(review.CreatedAt, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy")
+                            </span>
                         </div>
+
                         <div class="gw-review-stars">
                             @for (int i = 1; i <= 5; i++)
                             {
@@ -92,13 +103,18 @@
                         </div>
                     </div>
 
+                    @if (!review.IsVerified && !string.IsNullOrEmpty(review.Content))
+                    {
+                        <div style="padding:0.3rem 0.8rem 0;">
+                            <span class="badge bg-warning text-dark" style="font-size:0.68rem;">⏳ Oczekuje na weryfikację</span>
+                        </div>
+                    }
+
                     @if (!string.IsNullOrEmpty(review.Content))
                     {
                         <div class="gw-review-body" data-expanded="false">
                             <p class="gw-review-content">@review.Content</p>
-                            <button class="gw-review-expand-btn" onclick="toggleReview(this)">
-                                Pokaż więcej
-                            </button>
+                            <button class="gw-review-expand-btn" onclick="toggleReview(this)">Pokaż więcej</button>
                         </div>
                     }
 
@@ -108,25 +124,73 @@
                             <a asp-action="Edit" asp-route-id="@review.Id"
                                class="gw-action-link gw-action-edit">✏️ Edytuj</a>
                             <span class="gw-action-sep">|</span>
-                            <form asp-action="Delete" asp-route-id="@review.Id" method="post"
-                                  style="display:inline;">
+                            <form asp-action="Delete" asp-route-id="@review.Id" method="post" style="display:inline;">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="gw-action-link gw-action-delete"
-                                        style="background:none; border:none; cursor:pointer; font-size:0.83rem; font-weight:600;">
+                                        style="background:none; border:none; cursor:pointer; font-size:0.83rem; font-weight:600;"
+                                        onclick="return confirm('Usunąć recenzję?')">
                                     🗑️ Usuń
                                 </button>
                             </form>
                         </div>
                     }
-                    @if (User.Identity?.IsAuthenticated == true && !review.IsOwner)
+
+                    @if (isModCard)
                     {
-                        <button type="button" class="btn btn-link text-warning p-0 ms-3 text-decoration-none" style="font-size: 0.85rem;"
-                                data-bs-toggle="modal"
-                                data-bs-target="#reportModal"
-                                data-report-type="Review"
-                                data-report-targetid="@review.Id">
-                            🚩 Zgłoś
-                        </button>
+                        <div class="gw-review-footer" style="gap:0.5rem; flex-wrap:wrap;">
+                            <a asp-action="Edit" asp-route-id="@review.Id"
+                               class="gw-action-link" style="color:#f59e0b;">✏️ Edytuj</a>
+                            <span class="gw-action-sep">|</span>
+                            <button type="button" class="gw-action-link"
+                                    style="background:none; border:none; cursor:pointer; font-size:0.83rem;
+                                           font-weight:600; color:#f87171; padding:0;"
+                                    data-bs-toggle="modal" data-bs-target="#deleteReviewModal-@review.Id">
+                                🗑️ Usuń
+                            </button>
+                        </div>
+
+                        <div class="modal fade" id="deleteReviewModal-@review.Id" tabindex="-1">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content" style="background:#1a1d26; border:1px solid rgba(255,255,255,0.1);">
+                                    <div class="modal-header border-secondary">
+                                        <h5 class="modal-title text-white">Usuń recenzję</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form asp-action="DeleteByMod" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@review.Id" />
+                                        <input type="hidden" name="returnUrl" value="/Reviews/Index?gameId=@gameId" />
+                                        <div class="modal-body">
+                                            <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;">
+                                                Autor <strong style="color:#38bdf8;">@review.Username</strong> otrzyma powiadomienie. Tej operacji nie można cofnąć.
+                                            </p>
+                                            <label class="form-label text-light">Powód usunięcia</label>
+                                            <textarea name="deleteReason" class="form-control" rows="3"
+                                                      style="background:#0f1117; color:#e2e8f0; border-color:#334155;"
+                                                      placeholder="np. Wulgaryzmy, spam, treść niezgodna z regulaminem..."></textarea>
+                                        </div>
+                                        <div class="modal-footer border-secondary">
+                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                            <button type="submit" class="btn btn-danger">Usuń recenzję</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (User.Identity?.IsAuthenticated == true && !review.IsOwner && !isMod)
+                    {
+                        <div style="padding:0.5rem 0.8rem 0.2rem;">
+                            <button type="button" class="btn btn-link text-warning p-0 text-decoration-none"
+                                    style="font-size:0.85rem;"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#reportModal"
+                                    data-report-type="Review"
+                                    data-report-targetid="@review.Id">
+                                🚩 Zgłoś
+                            </button>
+                        </div>
                     }
                 </div>
             }

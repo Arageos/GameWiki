@@ -17,13 +17,11 @@
         <form asp-action="Edit" asp-route-id="@Model.Id" method="post" enctype="multipart/form-data" id="editForm">
             @Html.AntiForgeryToken()
 
-            @* Tytuł *@
             <div class="gw-form-group">
                 <label class="gw-label">Tytuł</label>
                 <input name="Title" value="@Model.Title" class="gw-input" required maxlength="200" />
             </div>
 
-            @* Zdjęcie tytułowe *@
             <div class="gw-form-group">
                 <label class="gw-label">Zdjęcie tytułowe</label>
                 @if (!string.IsNullOrEmpty(Model.CoverImageUrl))
@@ -42,7 +40,6 @@
                 </div>
             </div>
 
-            @* Bloki treści *@
             <div class="gw-form-group">
                 <label class="gw-label">Treść artykułu</label>
                 <p style="font-size:0.82rem; color:#64748b; margin-bottom:0.8rem;">
@@ -50,7 +47,6 @@
                 </p>
 
                 <div id="blocksContainer" style="display:flex; flex-direction:column; gap:0.8rem;">
-                    @* Istniejące bloki renderujemy z serwera *@
                     @{
                         int bi = 0;
                     }
@@ -107,7 +103,6 @@
 
 @section Scripts {
     <script>
-        // Startowy indeks bloków — kontynuujemy po istniejących
         let blockIndex = @initialBlockIndex;
 
         function addTextBlock() {

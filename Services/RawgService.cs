@@ -25,12 +25,10 @@ namespace GameWiki.Services
 
         [JsonPropertyName("background_image")]
         public string BackgroundImage { get; set; }
-
         public double Rating { get; set; }
 
         [JsonPropertyName("ratings_count")]
         public int RatingsCount { get; set; }
-
         public List<RawgGenre> Genres { get; set; }
         public List<RawgPlatformWrapper> Platforms { get; set; }
     }

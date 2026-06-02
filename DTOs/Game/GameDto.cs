@@ -6,7 +6,6 @@
         public string Title { get; set; }
         public string Description { get; set; }
         public DateTime ReleaseDate { get; set; }
-
         public string? BackgroundImage { get; set; }
         public double? RawgRating { get; set; }
         public int? RawgRatingsCount { get; set; }

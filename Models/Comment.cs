@@ -13,7 +13,8 @@ namespace GameWiki.Models
         [Required]
         [MaxLength(2000)]
         public string Content { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
         public int? ParentCommentId { get; set; }
         public Comment ParentComment { get; set; }
         public ICollection<CommentReaction> Reactions { get; set; }

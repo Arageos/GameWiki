@@ -1,4 +1,4 @@
-﻿@model GameWiki.Models.Article
+@model GameWiki.Models.Article
 @using GameWiki.Models
 @{
     ViewData["Title"] = Model.Title;
@@ -11,8 +11,6 @@
 }
 
 <div class="gw-section">
-
-    @* ── NAGŁÓWEK ── *@
     @if (!string.IsNullOrEmpty(Model.CoverImageUrl))
     {
         <div class="gw-details-banner" style="background-image:url('@Model.CoverImageUrl');">
@@ -20,7 +18,7 @@
                 <h1 class="gw-details-title">@Model.Title</h1>
                 <span class="gw-details-date">
                     @Model.Game?.Title &nbsp;·&nbsp; ✍️ @Model.Author?.Username
-                    &nbsp;·&nbsp; @Model.CreatedAt.ToString("dd.MM.yyyy")
+                    &nbsp;·&nbsp; @DateTime.SpecifyKind(Model.CreatedAt, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy")
                     @if (!Model.IsVerified)
                     {
                         <span class="badge bg-warning text-dark ms-2" style="font-size:0.7rem;">Oczekuje na weryfikację</span>
@@ -32,16 +30,31 @@
     else
     {
         <div class="gw-auth-header">
-            <div class="gw-auth-icon">📄</div>
+            <div class="gw-auth-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="1.4" width="52" height="52"
+                     style="color:#6366f1;">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+            </div>
             <h1 class="gw-auth-title">@Model.Title</h1>
-            <p class="gw-auth-sub">
-                @Model.Game?.Title &nbsp;·&nbsp; ✍️ @Model.Author?.Username
-                &nbsp;·&nbsp; @Model.CreatedAt.ToString("dd.MM.yyyy")
+            <span class="text-secondary small d-flex align-items-center justify-content-center gap-2">
+                ✍️ @Model.Author.Username
+                @{
+                    var authorRole = Model.Author?.UserRoles?.FirstOrDefault()?.Role?.Name;
+                    if (authorRole == "Admin" || authorRole == "Moderator")
+                    {
+                        var badgeClass = authorRole == "Admin" ? "nav-badge-admin" : "nav-badge-mod";
+                        var shortRole  = authorRole == "Moderator" ? "MOD" : "ADMIN";
+                        <span class="@badgeClass" style="font-size:0.65rem; vertical-align:middle; text-transform:uppercase;">@shortRole</span>
+                    }
+                }
                 @if (!Model.IsVerified)
                 {
-                    <span class="badge bg-warning text-dark ms-2">Oczekuje na weryfikację</span>
+                    <span class="badge bg-warning text-dark" style="font-size:0.65rem;">Oczekuje na weryfikację</span>
                 }
-            </p>
+            </span>
         </div>
     }
 
@@ -59,14 +72,14 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
-    
-    @* ── TREŚĆ ARTYKUŁU ── *@
+
     <div style="max-width:780px; margin:2rem auto 0;">
         @foreach (var block in Model.Blocks)
         {
             if (block.Type == ArticleBlockType.Text)
             {
-                <div style="color:#cbd5e1; font-size:1rem; line-height:1.85; margin-bottom:1.4rem; white-space:pre-wrap;">@block.Content</div>
+                <div style="color:#cbd5e1; font-size:1rem; line-height:1.85; margin-bottom:1.4rem;
+                            white-space:pre-wrap; text-align:center;">@block.Content</div>
             }
             else if (block.Type == ArticleBlockType.Image && !string.IsNullOrEmpty(block.Content))
             {
@@ -84,7 +97,6 @@
 
                 @if ((User.IsInRole("Admin") || User.IsInRole("Moderator")) && Model.AuthorId != currentUserId)
                 {
-                    @* Mod usuwa cudzy artykuł — modal z powodem *@
                     <button type="button" class="gw-btn-outline" style="color:#f87171; border-color:#f87171;"
                             data-bs-toggle="modal" data-bs-target="#deleteArticleModal">
                         🗑️ Usuń
@@ -103,8 +115,8 @@
                                         <p class="text-secondary small mb-3">Autor otrzyma powiadomienie. Tej operacji nie można cofnąć.</p>
                                         <label class="form-label text-light">Powód usunięcia (wyświetlony autorowi)</label>
                                         <textarea name="deleteReason" class="form-control" rows="3"
-                                          style="background:#0f1117; color:#e2e8f0; border-color:#334155;"
-                                          placeholder="np. Naruszenie regulaminu, dezinformacja..."></textarea>
+                                                  style="background:#0f1117; color:#e2e8f0; border-color:#334155;"
+                                                  placeholder="np. Naruszenie regulaminu, dezinformacja..."></textarea>
                                     </div>
                                     <div class="modal-footer border-secondary">
                                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
@@ -117,7 +129,6 @@
                 }
                 else
                 {
-                    @* Właściciel lub mod usuwa własny artykuł — bez powodu *@
                     <form asp-action="Delete" asp-route-id="@Model.Id" method="post" style="margin:0;"
                           onsubmit="return confirm('Na pewno usunąć artykuł?');">
                         @Html.AntiForgeryToken()
@@ -126,7 +137,8 @@
                 }
             }
             <a asp-action="Index" asp-route-gameId="@Model.GameId" class="gw-btn-outline">← Wróć</a>
-            @if (User.Identity?.IsAuthenticated == true && Model.AuthorId.ToString() != User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)
+            @if (User.Identity?.IsAuthenticated == true &&
+                 Model.AuthorId.ToString() != User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)
             {
                 <button type="button" class="btn btn-sm btn-outline-warning ms-3 rounded-pill"
                         data-bs-toggle="modal" data-bs-target="#reportModal"
@@ -136,13 +148,12 @@
             }
         </div>
 
-        @* ── SEKCJA KOMENTARZY ── *@
         <div style="margin-top:3rem;">
-            <h2 style="font-size:1.2rem; font-weight:700; color:#e2e8f0; margin-bottom:1.2rem; border-bottom:1px solid rgba(255,255,255,0.07); padding-bottom:0.6rem;">
+            <h2 style="font-size:1.2rem; font-weight:700; color:#e2e8f0; margin-bottom:1.2rem;
+                       border-bottom:1px solid rgba(255,255,255,0.07); padding-bottom:0.6rem;">
                 💬 Komentarze (@allComments.Count)
             </h2>
 
-            @* Formularz nowego komentarza *@
             @if (User.Identity?.IsAuthenticated == true)
             {
                 <form asp-action="AddComment" asp-route-articleId="@Model.Id" method="post"
@@ -150,8 +161,8 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="articleId" value="@Model.Id" />
                     <textarea name="content" class="gw-input" rows="3"
-                          placeholder="Napisz komentarz..."
-                          style="resize:vertical; margin-bottom:0.6rem;"></textarea>
+                              placeholder="Napisz komentarz..."
+                              style="resize:vertical; margin-bottom:0.6rem;"></textarea>
                     <button type="submit" class="gw-btn-primary" style="font-size:0.88rem;">Dodaj komentarz</button>
                 </form>
             }
@@ -162,15 +173,14 @@
                 </div>
             }
 
-            @* Lista komentarzy *@
             @foreach (var comment in RootComments())
             {
                 var commentViewData = new ViewDataDictionary(ViewData);
-                commentViewData["AllComments"] = allComments;
-                commentViewData["MyReactions"] = myReactions;
+                commentViewData["AllComments"]   = allComments;
+                commentViewData["MyReactions"]   = myReactions;
                 commentViewData["CurrentUserId"] = currentUserId;
-                commentViewData["ArticleId"] = Model.Id;
-                commentViewData["Depth"] = 0;
+                commentViewData["ArticleId"]     = Model.Id;
+                commentViewData["Depth"]         = 0;
                 @await Html.PartialAsync("_Comment", comment, commentViewData)
             }
         </div>

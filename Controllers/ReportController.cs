@@ -42,7 +42,6 @@ namespace GameWiki.Controllers
                 dateFrom = dateTo.AddDays(-30);
             }
 
-            // Dane do raportu
             var newGames = await _context.Games
                 .Where(g => g.AddedAt >= dateFrom && g.AddedAt <= dateTo)
                 .OrderByDescending(g => g.AddedAt)
@@ -76,7 +75,6 @@ namespace GameWiki.Controllers
                 .Take(20)
                 .ToListAsync();
 
-            // Licencja QuestPDF (community)
             QuestPDF.Settings.License = LicenseType.Community;
 
             var pdf = Document.Create(container =>
@@ -107,7 +105,6 @@ namespace GameWiki.Controllers
 
                     page.Content().PaddingTop(16).Column(col =>
                     {
-                        // Kafelki podsumowania
                         col.Item().Text("Podsumowanie okresu").FontSize(14).Bold().FontColor("#1e293b");
                         col.Item().PaddingTop(8).Row(row =>
                         {
@@ -131,7 +128,6 @@ namespace GameWiki.Controllers
 
                         col.Item().PaddingTop(20);
 
-                        // Lista nowych gier
                         col.Item().Text("Nowe gry w okresie").FontSize(14).Bold().FontColor("#1e293b");
                         col.Item().PaddingTop(6).Table(table =>
                         {
@@ -163,7 +159,6 @@ namespace GameWiki.Controllers
 
                         col.Item().PaddingTop(20);
 
-                        // Lista nowych artykułów
                         col.Item().Text("Nowe artykuły w okresie").FontSize(14).Bold().FontColor("#1e293b");
                         col.Item().PaddingTop(6).Table(table =>
                         {
@@ -204,7 +199,6 @@ namespace GameWiki.Controllers
 
                         col.Item().PaddingTop(20);
 
-                        // Tabela aktywności użytkowników
                         col.Item().Text("Aktywność użytkowników").FontSize(14).Bold().FontColor("#1e293b");
                         col.Item().PaddingTop(6).Table(table =>
                         {

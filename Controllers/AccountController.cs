@@ -109,7 +109,7 @@ namespace GameWiki.Controllers
 
                 if (lastBanAppeal != null && banNotification != null && lastBanAppeal.CreatedAt < banNotification.CreatedAt)
                 {
-                    ViewBag.BanAppealStatus = null; // Resetujemy status dla nowego cyklu bana
+                    ViewBag.BanAppealStatus = null;
                 }
                 else
                 {
@@ -140,7 +140,6 @@ namespace GameWiki.Controllers
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return RedirectToAction("Index", "Home");
         }
-
         public IActionResult AccessDenied() => View();
 
         private async Task SignInUser(User user, string role, bool rememberMe)
@@ -196,7 +195,6 @@ namespace GameWiki.Controllers
 
             ViewBag.RoleName = role;
 
-            // Artykuły użytkownika
             ViewBag.UserArticles = await _context.Articles
                 .Include(a => a.Game)
                 .Where(a => a.AuthorId == userId)
@@ -358,10 +356,7 @@ namespace GameWiki.Controllers
         public async Task<IActionResult> DeleteNotification(int id)
         {
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-
-            // Upewniamy się, że powiadomienie istnieje i należy do tego użytkownika
-            var notification = await _context.UserNotifications
-                .FirstOrDefaultAsync(n => n.Id == id && n.UserId == userId);
+            var notification = await _context.UserNotifications.FirstOrDefaultAsync(n => n.Id == id && n.UserId == userId);
 
             if (notification != null)
             {

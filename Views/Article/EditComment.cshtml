@@ -1,0 +1,48 @@
+@model GameWiki.Models.Comment
+@{
+    ViewData["Title"] = "Edytuj komentarz";
+    int articleId = (int)ViewBag.ArticleId;
+    bool isModEdit = (bool)(ViewBag.IsModEdit ?? false);
+    string? originalAuthor = ViewBag.OriginalAuthor as string;
+}
+
+<div class="gw-section" style="max-width:680px; margin:0 auto;">
+    <div class="gw-auth-header">
+        <div class="gw-auth-icon">✏️</div>
+        <h1 class="gw-auth-title">Edytuj komentarz</h1>
+        @if (isModEdit)
+        {
+            <p style="color:#f59e0b; font-size:0.88rem; text-align:center;">
+                Edytujesz komentarz użytkownika <strong>@originalAuthor</strong>.
+                Autor otrzyma powiadomienie.
+            </p>
+        }
+    </div>
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-3">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <form asp-controller="Article" asp-action="EditComment" method="post" class="mt-4">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="commentId" value="@Model.Id" />
+        <input type="hidden" name="articleId" value="@articleId" />
+
+        <div class="mb-3">
+            <label class="form-label text-light">Treść komentarza</label>
+            <textarea name="content" class="gw-input" rows="5"
+                      style="resize:vertical;"
+                      maxlength="2000">@Model.Content</textarea>
+        </div>
+
+        <div style="display:flex; gap:0.8rem; flex-wrap:wrap;">
+            <button type="submit" class="gw-btn-primary">💾 Zapisz zmiany</button>
+            <a asp-controller="Article" asp-action="Details" asp-route-id="@articleId"
+               class="gw-btn-outline">← Anuluj</a>
+        </div>
+    </form>
+</div>

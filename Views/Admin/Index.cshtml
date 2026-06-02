@@ -78,7 +78,6 @@
                                     <div class="d-flex justify-content-end gap-2">
                                         @if (user.RoleName == "Moderator")
                                         {
-                                            @* Mod — tylko degradacja, bez bana *@
                                             @if (User.IsInRole("Admin"))
                                             {
                                                 <form asp-action="ToggleModRole" method="post" class="m-0">
@@ -91,7 +90,6 @@
                                         }
                                         else
                                         {
-                                            @* Zwykły użytkownik — ban/unban + awans na moda *@
                                             @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
                                             {
                                                 @if (user.IsBanned)

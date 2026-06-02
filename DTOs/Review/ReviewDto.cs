@@ -4,12 +4,15 @@
     {
         public int Id { get; set; }
         public int GameId { get; set; }
+        public int UserId { get; set; }
         public string GameTitle { get; set; }
         public string Username { get; set; }
         public string? AvatarUrl { get; set; }
+        public string? AuthorRoleName { get; set; }
         public int Rating { get; set; }
         public string? Content { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsOwner { get; set; }
+        public bool IsVerified { get; set; }
     }
 }

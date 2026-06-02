@@ -44,11 +44,9 @@ namespace GameWiki.Services
                 .ToListAsync();
         }
 
-        public async Task<List<Genre>> GetGenresAsync()
-            => await _context.Genres.OrderBy(g => g.Name).ToListAsync();
+        public async Task<List<Genre>> GetGenresAsync() => await _context.Genres.OrderBy(g => g.Name).ToListAsync();
 
-        public async Task<List<Platform>> GetPlatformsAsync()
-            => await _context.Platforms.OrderBy(p => p.Name).ToListAsync();
+        public async Task<List<Platform>> GetPlatformsAsync() => await _context.Platforms.OrderBy(p => p.Name).ToListAsync();
 
         public async Task<GameIndexViewModel> GetGameIndexViewModelAsync(
         string? search, int? genreId, int? platformId)

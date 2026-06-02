@@ -26,7 +26,6 @@
         <div class="gw-alert-error">⚠ @TempData["ImportError"]</div>
     }
 
-    @* Wyszukiwarka *@
     <form asp-action="Index" method="get" style="display:flex; gap:0.8rem; margin-bottom:1.5rem;">
         <input type="text" name="search" value="@search" class="gw-input"
                placeholder="Szukaj gry..." style="max-width:360px;" />
@@ -62,8 +61,7 @@
                             <form asp-action="Import" method="post" style="display:inline;">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="rawgId" value="@game.Id" />
-                                <button type="submit" class="gw-action-link gw-action-edit"
-                                        style="background:none; border:none; cursor:pointer; font-size:0.83rem;">
+                                <button type="submit" class="gw-action-link gw-action-edit" style="background:none; border:none; cursor:pointer; font-size:0.83rem;">
                                     + Importuj
                                 </button>
                             </form>
@@ -77,14 +75,12 @@
     <div style="display:flex; gap:1rem; margin-top:1.5rem; align-items:center;">
         @if (currentPage > 1)
         {
-            <a asp-action="Index" asp-route-page="@(currentPage - 1)" asp-route-search="@search"
-               class="gw-btn-outline">← Poprzednia</a>
+            <a asp-action="Index" asp-route-page="@(currentPage - 1)" asp-route-search="@search" class="gw-btn-outline">← Poprzednia</a>
         }
         <span style="color:#64748b; font-size:0.85rem;">Strona @currentPage</span>
         @if (hasNext)
         {
-            <a asp-action="Index" asp-route-page="@(currentPage + 1)" asp-route-search="@search"
-               class="gw-btn-primary">Następna →</a>
+            <a asp-action="Index" asp-route-page="@(currentPage + 1)" asp-route-search="@search" class="gw-btn-primary">Następna →</a>
         }
     </div>
 </div>
