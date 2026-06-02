@@ -12,7 +12,6 @@ namespace GameWiki.DTOs.Game
 
         [Required]
         public string Description { get; set; }
-
         public DateTime ReleaseDate { get; set; }
     }
 }

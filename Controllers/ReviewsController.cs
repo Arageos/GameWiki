@@ -16,7 +16,6 @@ namespace GameWiki.Controllers
             _context = context;
         }
 
-        
         public async Task<IActionResult> Index(int gameId)
         {
             var game = await _context.Games.FindAsync(gameId);
@@ -40,7 +39,8 @@ namespace GameWiki.Controllers
                     Rating = r.Rating,
                     Content = r.Content,
                     CreatedAt = r.CreatedAt,
-                    IsOwner = userId != null && r.UserId == userId
+                    IsOwner = userId != null && r.UserId == userId,
+                    IsVerified = r.IsVerified
                 })
                 .ToListAsync();
 
@@ -51,7 +51,6 @@ namespace GameWiki.Controllers
             return View(reviews);
         }
 
-        
         [Authorize]
         public async Task<IActionResult> Create(int gameId)
         {
@@ -73,7 +72,6 @@ namespace GameWiki.Controllers
             return View(dto);
         }
 
-        
         [HttpPost]
         [Authorize]
         [ValidateAntiForgeryToken]
@@ -114,7 +112,6 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(Index), new { gameId = dto.GameId });
         }
 
-        
         [Authorize]
         public async Task<IActionResult> Edit(int id)
         {
@@ -139,7 +136,6 @@ namespace GameWiki.Controllers
             return View(dto);
         }
 
-        
         [HttpPost]
         [Authorize]
         [ValidateAntiForgeryToken]
@@ -164,7 +160,6 @@ namespace GameWiki.Controllers
 
             return RedirectToAction(nameof(Index), new { gameId = review.GameId });
         }
-
 
         [HttpPost]
         [Authorize]
