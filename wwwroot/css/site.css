@@ -1343,3 +1343,43 @@ body {
     background: linear-gradient(to right, #0f1117, transparent);
     pointer-events: none;
 }
+
+.gw-review-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.gw-review-avatar-fallback {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #6366f1;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.gw-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #1e1e2e;
+    border: 1px solid #2a2a3d;
+    z-index: 999;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+    .gw-suggestions div {
+        padding: 10px;
+        cursor: pointer;
+    }
+
+        .gw-suggestions div:hover {
+            background: #2a2a3d;
+        }

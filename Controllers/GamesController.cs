@@ -22,15 +22,8 @@ namespace GameWiki.Controllers
 
         public async Task<IActionResult> Index(string? search, int? genreId, int? platformId)
         {
-            var games = await _gameService.GetFilteredGamesAsync(search, genreId, platformId);
-
-            ViewBag.Genres = await _gameService.GetGenresAsync();
-            ViewBag.Platforms = await _gameService.GetPlatformsAsync();
-            ViewBag.Search = search;
-            ViewBag.GenreId = genreId;
-            ViewBag.PlatformId = platformId;
-
-            return View(games);
+            var vm = await _gameService.GetGameIndexViewModelAsync(search, genreId, platformId);
+            return View(vm);
         }
 
 
@@ -170,6 +163,13 @@ namespace GameWiki.Controllers
             }
 
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> SearchTitles(string term)
+        {
+            var titles = await _gameService.GetGameTitlesAsync(term);
+            return Json(titles);
         }
     }
 }

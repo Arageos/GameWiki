@@ -6,6 +6,7 @@
 }
 
 <div class="gw-section">
+
     @if (!string.IsNullOrEmpty((string?)ViewBag.BackgroundImage))
     {
         <div class="gw-details-banner"
@@ -19,8 +20,13 @@
     }
     else
     {
-        <div class="gw-section-header" style="text-align:left;">
+        <div class="gw-section-header" style="text-align:left; margin-bottom:2rem;">
             <h1 class="gw-section-title">⭐ Recenzje — @ViewBag.GameTitle</h1>
+
+
+            <div class="gw-profile-avatar-large">
+                @(ViewBag.GameTitle != null ? ViewBag.GameTitle.ToString()[0].ToString().ToUpper() : "🎮")
+            </div>
         </div>
     }
     @if (TempData["SuccessMessage"] != null)
@@ -62,8 +68,18 @@
             {
                 <div class="gw-review-card">
                     <div class="gw-review-header">
-                        <img src="@(string.IsNullOrEmpty(review.AvatarUrl) ? "/images/default-avatar.png" : review.AvatarUrl)"
-                             class="gw-review-avatar" alt="@review.Username" />
+                        @if (!string.IsNullOrWhiteSpace(review.AvatarUrl))
+                        {
+                            <img src="@review.AvatarUrl"
+                                 class="gw-review-avatar"
+                                 alt="@review.Username" />
+                        }
+                        else
+                        {
+                            <div class="gw-review-avatar gw-review-avatar-fallback">
+                                @(review.Username?.Substring(0, 1).ToUpper() ?? "U")
+                            </div>
+                        }
                         <div class="gw-review-meta">
                             <span class="gw-review-username">@review.Username</span>
                             <span class="gw-review-date">@review.CreatedAt.ToString("dd.MM.yyyy")</span>

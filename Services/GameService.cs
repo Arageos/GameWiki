@@ -50,6 +50,30 @@ namespace GameWiki.Services
         public async Task<List<Platform>> GetPlatformsAsync()
             => await _context.Platforms.OrderBy(p => p.Name).ToListAsync();
 
-        
+        public async Task<GameIndexViewModel> GetGameIndexViewModelAsync(
+        string? search, int? genreId, int? platformId)
+            {
+                return new GameIndexViewModel
+                {
+                    Games = await GetFilteredGamesAsync(search, genreId, platformId),
+                    Genres = await GetGenresAsync(),
+                    Platforms = await GetPlatformsAsync(),
+                    Search = search,
+                    GenreId = genreId,
+                    PlatformId = platformId
+                };
+            }
+        public async Task<List<string>> GetGameTitlesAsync(string term)
+        {
+            if (string.IsNullOrWhiteSpace(term))
+                return new List<string>();
+
+            return await _context.Games
+                .Where(g => g.Title.Contains(term))
+                .OrderBy(g => g.Title)
+                .Select(g => g.Title)
+                .Take(10)
+                .ToListAsync();
+        }
     }
 }
