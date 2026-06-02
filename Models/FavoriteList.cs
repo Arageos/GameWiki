@@ -5,14 +5,12 @@ namespace GameWiki.Models
     public class FavoriteList
     {
         public int Id { get; set; }
-
         public int UserId { get; set; }
-        public User User { get; set; } // <-- Powiązanie z Userem
+        public User User { get; set; }
 
         [Required(ErrorMessage = "Nazwa listy jest wymagana")]
         [MaxLength(50)]
         public string Name { get; set; }
-
         public ICollection<FavoriteGame> FavoriteGames { get; set; }
     }
 }

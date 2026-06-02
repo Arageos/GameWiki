@@ -8,6 +8,7 @@ namespace GameWiki.Models
         public Game Game { get; set; }
         public int UserId { get; set; }
         public User User { get; set; }
+
         [Required]
         [Range(1, 5)]
         public int Rating { get; set; }

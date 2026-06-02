@@ -76,56 +76,73 @@
                                 @if (user.Id != currentUserId && user.RoleName != "Admin")
                                 {
                                     <div class="d-flex justify-content-end gap-2">
-                                        @if (User.IsInRole("Admin") || (User.IsInRole("Moderator") && user.RoleName == "User"))
+                                        @if (user.RoleName == "Moderator")
                                         {
-                                            @if (user.IsBanned)
+                                            @* Mod — tylko degradacja, bez bana *@
+                                            @if (User.IsInRole("Admin"))
                                             {
-                                                <form asp-action="ToggleBan" method="post" class="m-0">
+                                                <form asp-action="ToggleModRole" method="post" class="m-0">
                                                     <input type="hidden" name="userId" value="@user.Id" />
-                                                    <button type="submit" class="btn btn-sm btn-outline-success">Odbanuj</button>
+                                                    <button type="submit" class="btn btn-sm btn-outline-warning">
+                                                        Zdegraduj z Moda
+                                                    </button>
                                                 </form>
                                             }
-                                            else
+                                        }
+                                        else
+                                        {
+                                            @* Zwykły użytkownik — ban/unban + awans na moda *@
+                                            @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
                                             {
-                                                <button type="button" class="btn btn-sm btn-outline-danger"
-                                                        data-bs-toggle="modal" data-bs-target="#banModal-@user.Id">
-                                                    Zbanuj
-                                                </button>
+                                                @if (user.IsBanned)
+                                                {
+                                                    <form asp-action="ToggleBan" method="post" class="m-0">
+                                                        <input type="hidden" name="userId" value="@user.Id" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-success">Odbanuj</button>
+                                                    </form>
+                                                }
+                                                else
+                                                {
+                                                    <button type="button" class="btn btn-sm btn-outline-danger"
+                                                            data-bs-toggle="modal" data-bs-target="#banModal-@user.Id">
+                                                        Zbanuj
+                                                    </button>
 
-                                                <div class="modal fade" id="banModal-@user.Id" tabindex="-1">
-                                                    <div class="modal-dialog modal-dialog-centered">
-                                                        <div class="modal-content" style="background: #1a1d26; border: 1px solid rgba(255,255,255,0.1);">
-                                                            <div class="modal-header border-secondary">
-                                                                <h5 class="modal-title text-white">Zbanuj użytkownika @user.Username</h5>
-                                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                                            </div>
-                                                            <form asp-action="ToggleBan" method="post">
-                                                                <div class="modal-body">
-                                                                    <input type="hidden" name="userId" value="@user.Id" />
-                                                                    <label class="form-label text-light">Powód bana (wyświetlony użytkownikowi)</label>
-                                                                    <textarea name="banReason" class="form-control" rows="3"
+                                                    <div class="modal fade" id="banModal-@user.Id" tabindex="-1">
+                                                        <div class="modal-dialog modal-dialog-centered">
+                                                            <div class="modal-content" style="background: #1a1d26; border: 1px solid rgba(255,255,255,0.1);">
+                                                                <div class="modal-header border-secondary">
+                                                                    <h5 class="modal-title text-white">Zbanuj użytkownika @user.Username</h5>
+                                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <form asp-action="ToggleBan" method="post">
+                                                                    <div class="modal-body">
+                                                                        <input type="hidden" name="userId" value="@user.Id" />
+                                                                        <label class="form-label text-light">Powód bana (wyświetlony przy logowaniu)</label>
+                                                                        <textarea name="banReason" class="form-control" rows="3"
                                                               style="background: #0f1117; color: #e2e8f0; border-color: #334155;"
                                                               placeholder="np. Spam, wulgaryzmy, wielokrotne naruszenia regulaminu..."></textarea>
-                                                                </div>
-                                                                <div class="modal-footer border-secondary">
-                                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
-                                                                    <button type="submit" class="btn btn-danger">Zbanuj</button>
-                                                                </div>
-                                                            </form>
+                                                                    </div>
+                                                                    <div class="modal-footer border-secondary">
+                                                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+                                                                        <button type="submit" class="btn btn-danger">Zbanuj</button>
+                                                                    </div>
+                                                                </form>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
+                                                }
                                             }
-                                        }
 
-                                        @if (User.IsInRole("Admin"))
-                                        {
-                                            <form asp-action="ToggleModRole" method="post" class="m-0">
-                                                <input type="hidden" name="userId" value="@user.Id" />
-                                                <button type="submit" class="btn btn-sm @(user.RoleName == "Moderator" ? "btn-outline-warning" : "btn-outline-info")">
-                                                    @(user.RoleName == "Moderator" ? "Zdegraduj z Moda" : "Awansuj na Moda")
-                                                </button>
-                                            </form>
+                                            @if (User.IsInRole("Admin") && !user.IsBanned)
+                                            {
+                                                <form asp-action="ToggleModRole" method="post" class="m-0">
+                                                    <input type="hidden" name="userId" value="@user.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-info">
+                                                        Awansuj na Moda
+                                                    </button>
+                                                </form>
+                                            }
                                         }
                                     </div>
                                 }
