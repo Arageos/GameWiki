@@ -3,9 +3,8 @@
     public class FavoriteGame
     {
         public int FavoriteListId { get; set; }
-        public FavoriteList FavoriteList { get; set; } // <-- Powiązanie
-
+        public FavoriteList FavoriteList { get; set; }
         public int GameId { get; set; }
-        public Game Game { get; set; } // <-- Powiązanie
+        public Game Game { get; set; }
     }
 }

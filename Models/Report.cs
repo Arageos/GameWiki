@@ -8,21 +8,15 @@ namespace GameWiki.Models
     public class Report
     {
         public int Id { get; set; }
-
         public int ReporterId { get; set; }
         public User Reporter { get; set; }
-
         public ReportType Type { get; set; }
-
-        // Przechowuje ID zgłaszanego elementu (ID artykułu, komentarza, recenzji lub użytkownika)
         public int TargetId { get; set; }
 
         [Required]
         [MaxLength(500)]
         public string Reason { get; set; }
-
         public ReportStatus Status { get; set; } = ReportStatus.Pending;
-
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
     }
 }

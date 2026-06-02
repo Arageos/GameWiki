@@ -71,20 +71,6 @@ namespace GameWiki.Controllers
 
             targetUser.IsBanned = !targetUser.IsBanned;
 
-            // Wysyłamy powiadomienie do użytkownika
-            var notification = new UserNotification
-            {
-                UserId = userId,
-                Type = targetUser.IsBanned ? NotificationType.Ban : NotificationType.Unban,
-                Message = targetUser.IsBanned
-                    ? "Twoje konto zostało zablokowane."
-                    : "Twoje konto zostało odblokowane.",
-                Reason = targetUser.IsBanned
-                    ? (string.IsNullOrWhiteSpace(banReason) ? "Brak podanego powodu." : banReason)
-                    : null
-            };
-
-            _context.UserNotifications.Add(notification);
             await _context.SaveChangesAsync();
 
             TempData["SuccessMessage"] = targetUser.IsBanned
@@ -330,16 +316,6 @@ namespace GameWiki.Controllers
                 if (appeal.User != null && appeal.User.IsBanned)
                 {
                     appeal.User.IsBanned = false;
-
-                    // Wysyłamy powiadomienie o pomyślnym odbanowaniu
-                    var notification = new UserNotification
-                    {
-                        UserId = appeal.UserId,
-                        Message = "Twoje odwołanie zostało rozpatrzone pozytywnie. Twoje konto zostało odblokowane!",
-                        Type = NotificationType.Unban,
-                        Reason = "Zatwierdzenie zgłoszenia apelacyjnego przez administrację."
-                    };
-                    _context.UserNotifications.Add(notification);
                 }
 
                 TempData["SuccessMessage"] = $"Odwołanie użytkownika {appeal.User?.Username} zostało zaakceptowane. Konto zostało pomyślnie odbanowane.";
@@ -347,17 +323,6 @@ namespace GameWiki.Controllers
             else if (actionType == "reject")
             {
                 appeal.Status = AppealStatus.Rejected;
-
-                // 2. POWIADOMIENIE O ODRZUCENIU APELACJI
-                var notification = new UserNotification
-                {
-                    UserId = appeal.UserId,
-                    Message = "Twoje odwołanie od decyzji moderacji zostało odrzucone po ponownej weryfikacji.",
-                    Type = NotificationType.ContentRemoved, // Używamy typu generycznego dla powiadomień systemowych
-                    Reason = "Decyzja podtrzymana przez Administratora. Brak podstaw do zmiany werdyktu."
-                };
-                _context.UserNotifications.Add(notification);
-
                 TempData["SuccessMessage"] = $"Odwołanie użytkownika {appeal.User?.Username} zostało odrzucone.";
             }
 

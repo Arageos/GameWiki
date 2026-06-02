@@ -14,14 +14,11 @@ namespace GameWiki.Models
         [Required]
         [MaxLength(10000)]
         public string Description { get; set; }
-
         public DateTime ReleaseDate { get; set; }
-        public DateTime AddedAt { get; set; } = DateTime.UtcNow;
-
+        public DateTime AddedAt { get; set; } = DateTime.Now;
         public string? BackgroundImage { get; set; }
         public double? RawgRating { get; set; }
         public int? RawgRatingsCount { get; set; }
-
         public ICollection<GameGenre> GameGenres { get; set; }
         public ICollection<GamePlatform> GamePlatforms { get; set; }
         public ICollection<Review> Reviews { get; set; } = new List<Review>();
