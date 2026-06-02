@@ -8,7 +8,7 @@ namespace GameWiki.DTOs.Article
         public ArticleBlockType Type { get; set; }
         public string? TextContent { get; set; }
         public IFormFile? ImageFile { get; set; }
-        public string? ExistingImageUrl { get; set; }
+        public string? ExistingImageUrl { get; set; }  // przy edycji
     }
 
     public class CreateArticleDto
@@ -18,7 +18,9 @@ namespace GameWiki.DTOs.Article
         [Required(ErrorMessage = "Tytuł jest wymagany.")]
         [MaxLength(200)]
         public string Title { get; set; }
+
         public IFormFile? CoverImage { get; set; }
+
         public List<BlockInputDto>? Blocks { get; set; }
     }
 
@@ -27,7 +29,9 @@ namespace GameWiki.DTOs.Article
         [Required(ErrorMessage = "Tytuł jest wymagany.")]
         [MaxLength(200)]
         public string Title { get; set; }
+
         public IFormFile? CoverImage { get; set; }
+
         public List<BlockInputDto>? Blocks { get; set; }
     }
 }

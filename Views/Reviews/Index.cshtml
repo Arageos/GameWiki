@@ -67,10 +67,6 @@
                         <div class="gw-review-meta">
                             <span class="gw-review-username">@review.Username</span>
                             <span class="gw-review-date">@review.CreatedAt.ToString("dd.MM.yyyy")</span>
-                            @if (!review.IsVerified && !string.IsNullOrEmpty(review.Content))
-                            {
-                                <span class="badge bg-warning text-dark" style="font-size:0.65rem;">Niezweryfikowana</span>
-                            }
                         </div>
                         <div class="gw-review-stars">
                             @for (int i = 1; i <= 5; i++)

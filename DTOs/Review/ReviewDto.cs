@@ -11,6 +11,5 @@
         public string? Content { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsOwner { get; set; }
-        public bool IsVerified { get; set; }
     }
 }
