@@ -37,7 +37,7 @@
                 </div>
                 <span style="font-weight:600; color:#e2e8f0; font-size:0.9rem;">@Model.User?.Username</span>
                 <span style="color:#475569; font-size:0.78rem;">
-                    @DateTime.SpecifyKind(Model.CreatedAt, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    @Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")
                     @if (Model.UpdatedAt.HasValue)
                     {
                         <span style="color:#475569; font-size:0.72rem; font-style:italic;"> (edytowano)</span>

@@ -53,7 +53,7 @@
                                 @for (int i = 1; i <= 5; i++) { @(i <= review.Rating ? "★" : "☆") }
                                 (@review.Rating/5)
                             </span>
-                            <span>🕐 @DateTime.SpecifyKind(review.CreatedAt, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                            <span>🕐 @review.CreatedAt.ToString("dd.MM.yyyy HH:mm")</span>
                         </div>
 
                         @if (!string.IsNullOrEmpty(review.Content))

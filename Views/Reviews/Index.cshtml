@@ -91,7 +91,7 @@
                                 }
                             </div>
                             <span class="gw-review-date">
-                                @DateTime.SpecifyKind(review.CreatedAt, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy")
+                                @review.CreatedAt.ToString("dd.MM.yyyy")
                             </span>
                         </div>
 

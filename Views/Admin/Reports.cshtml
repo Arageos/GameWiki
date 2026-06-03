@@ -9,7 +9,7 @@
             <h2 class="text-white fw-bold">🚩 Zgłoszone treści</h2>
             <p style="color:#64748b; margin:0; font-size:0.88rem;">Zgłoszenia oczekujące na rozpatrzenie</p>
         </div>
-        <a asp-action="Index" class="gw-btn-outline" style="font-size:0.88rem;">← Panel admina</a>
+        <a asp-controller="Admin" asp-action="Index" class="gw-btn-outline" style="font-size:0.88rem;">← Panel admina</a>
     </div>
 
     @if (TempData["SuccessMessage"] != null)
@@ -35,24 +35,19 @@
                 <div class="col-12 mb-4">
                     <div class="gw-card p-4" style="background:#1a1d26; border-radius:12px; border-left:4px solid #f59e0b;">
 
-                        <div class="d-flex justify-content-between mb-3 border-bottom border-secondary pb-2">
+                        <div class="d-flex justify-content-between mb-3 border-bottom border-secondary pb-2" style="flex-wrap:wrap; gap:0.5rem;">
                             <div style="display:flex; align-items:center; gap:0.7rem; flex-wrap:wrap;">
                                 <span class="badge bg-warning text-dark text-uppercase">@report.Type.ToString()</span>
                                 <span style="color:#94a3b8; font-size:0.85rem;">
                                     Zgłoszone przez: <strong style="color:#e2e8f0;">@report.ReporterName</strong>
-                                    &nbsp;·&nbsp;
-                                    @DateTime.SpecifyKind(report.CreatedAt, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                    &nbsp;·&nbsp; @report.CreatedAt.ToString("dd.MM.yyyy HH:mm")
                                 </span>
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <span style="color:#64748b; font-size:0.78rem; text-transform:uppercase; font-weight:600; letter-spacing:0.05em;">
-                                Powód zgłoszenia:
-                            </span>
-                            <p style="color:#e2e8f0; font-style:italic; margin-top:0.3rem; margin-bottom:0;">
-                                „@report.Reason"
-                            </p>
+                            <span style="color:#94a3b8; font-size:0.78rem; text-transform:uppercase; font-weight:600; letter-spacing:0.05em;">Powód zgłoszenia:</span>
+                            <p style="color:#e2e8f0; font-style:italic; margin-top:0.3rem; margin-bottom:0;">„@report.Reason"</p>
                         </div>
 
                         @if (report.Type == GameWiki.Models.ReportType.Comment || report.Type == GameWiki.Models.ReportType.Review)
@@ -69,9 +64,7 @@
                         <div class="d-flex gap-2 flex-wrap">
                             @if (report.Type == GameWiki.Models.ReportType.Article)
                             {
-                                <a href="/Article/Details/@report.TargetId" class="btn btn-sm btn-outline-info">
-                                    👁️ Przejdź do artykułu
-                                </a>
+                                <a href="/Article/Details/@report.TargetId" class="btn btn-sm btn-outline-info">👁️ Przejdź do artykułu</a>
                             }
 
                             <form asp-action="HandleReport" method="post" class="m-0">

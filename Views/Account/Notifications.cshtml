@@ -56,9 +56,7 @@
                     _                                               => ("ℹ️", "#6366f1", "rgba(99,102,241,0.07)")
                 };
 
-                var displayTime = DateTime.SpecifyKind(n.CreatedAt, DateTimeKind.Utc)
-                                          .ToLocalTime()
-                                          .ToString("dd.MM.yyyy HH:mm");
+                var displayTime = n.CreatedAt.ToString("dd.MM.yyyy HH:mm");
 
                 <div class="p-4 rounded-3 @(n.IsRead ? "" : "fw-semibold")"
                      style="background:@bgColor; border:1px solid @borderColor; border-left:4px solid @borderColor; opacity:@(n.IsRead ? "0.65" : "1");">
