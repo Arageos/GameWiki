@@ -1,4 +1,4 @@
-﻿using GameWiki.DTOs.Article;
+using GameWiki.DTOs.Article;
 using GameWiki.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,7 +15,6 @@ namespace GameWiki.Services
             _env = env;
         }
 
-        // ── Pomocnik: powiadom wszystkich Admin/Mod ──────────────────────────
         public async Task NotifyModsAsync(NotificationType type, string message, string? actionUrl = null)
         {
             var modAdminIds = await _context.UserRoles
@@ -32,12 +31,11 @@ namespace GameWiki.Services
                     Type = type,
                     Message = message,
                     ActionUrl = actionUrl,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 });
             }
         }
 
-        // ────────────────────────────────────────────────────────────────────
         public async Task<(List<Article> Articles, string? SelectedGameTitle)> GetArticlesAsync(int? gameId, string? gameSearch)
         {
             var query = _context.Articles
@@ -100,7 +98,7 @@ namespace GameWiki.Services
                 AuthorId = authorId,
                 Title = dto.Title,
                 IsVerified = isVerified,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             if (dto.CoverImage != null && dto.CoverImage.Length > 0)
@@ -112,13 +110,12 @@ namespace GameWiki.Services
             await SaveBlocksAsync(article.Id, dto.Blocks);
             await _context.SaveChangesAsync();
 
-            // Powiadom moderatorów o nowym artykule do weryfikacji
             if (!isVerified)
             {
                 var author = await _context.Users.FindAsync(authorId);
                 await NotifyModsAsync(
                     NotificationType.NewArticle,
-                    $"Nowy artykuł do weryfikacji: {article.Title} — autor: { author?.Username}",
+                    $"Nowy artykuł do weryfikacji: {article.Title} — autor: {author?.Username}",
                     $"/Admin/PendingArticles"
                 );
                 await _context.SaveChangesAsync();
@@ -137,7 +134,7 @@ namespace GameWiki.Services
         public async Task UpdateArticleAsync(Article article, EditArticleDto dto)
         {
             article.Title = dto.Title;
-            article.UpdatedAt = DateTime.UtcNow;
+            article.UpdatedAt = DateTime.Now;
 
             if (dto.CoverImage != null && dto.CoverImage.Length > 0)
                 article.CoverImageUrl = await SaveImageAsync(dto.CoverImage);
@@ -147,7 +144,6 @@ namespace GameWiki.Services
             await _context.SaveChangesAsync();
         }
 
-        // Wersja z powiadomieniem (wywołaj gdy mod edytuje cudzy artykuł)
         public async Task UpdateArticleWithNotificationAsync(Article article, EditArticleDto dto, int editorId)
         {
             await UpdateArticleAsync(article, dto);
@@ -160,7 +156,7 @@ namespace GameWiki.Services
                     Type = NotificationType.ContentEdited,
                     Message = $"Twój artykuł {article.Title} został zedytowany przez moderację.",
                     ActionUrl = $"/Article/Details/{article.Id}",
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 });
                 await _context.SaveChangesAsync();
             }
@@ -176,7 +172,7 @@ namespace GameWiki.Services
                     Type = NotificationType.ContentRemoved,
                     Message = "Twój artykuł został usunięty przez moderację.",
                     Reason = string.IsNullOrWhiteSpace(reason) ? "Naruszenie regulaminu." : reason,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 });
             }
 
@@ -206,7 +202,7 @@ namespace GameWiki.Services
                 Type = NotificationType.ContentRemoved,
                 Message = "Twój artykuł został odrzucony przez moderację.",
                 Reason = string.IsNullOrWhiteSpace(reason) ? "Artykuł nie spełnia wymogów serwisu." : reason,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             });
 
             await ResolveRelatedReportsAsync(ReportType.Article, id);
@@ -222,7 +218,7 @@ namespace GameWiki.Services
                 ArticleId = articleId,
                 UserId = userId,
                 Content = content.Trim(),
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.Now,
                 ParentCommentId = parentCommentId
             });
             await _context.SaveChangesAsync();
@@ -239,7 +235,7 @@ namespace GameWiki.Services
         {
             bool isModEdit = comment.UserId != editorId;
             comment.Content = newContent.Trim();
-            comment.UpdatedAt = DateTime.UtcNow;
+            comment.UpdatedAt = DateTime.Now;
 
             if (isModEdit)
             {
@@ -248,7 +244,7 @@ namespace GameWiki.Services
                     UserId = comment.UserId,
                     Type = NotificationType.ContentEdited,
                     Message = "Twój komentarz został zedytowany przez moderację.",
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 });
             }
 
@@ -266,7 +262,7 @@ namespace GameWiki.Services
                     Type = NotificationType.ContentRemoved,
                     Message = "Twój komentarz został usunięty przez moderację.",
                     Reason = string.IsNullOrWhiteSpace(reason) ? "Naruszenie regulaminu." : reason,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 });
             }
 

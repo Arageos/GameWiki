@@ -37,7 +37,7 @@
                 </div>
                 <span style="font-weight:600; color:#e2e8f0; font-size:0.9rem;">@Model.User?.Username</span>
                 <span style="color:#475569; font-size:0.78rem;">
-                    @Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")
+                    <span data-utc="@Model.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss") data-utc-format="dt">@Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")</span>
                     @if (Model.UpdatedAt.HasValue)
                     {
                         <span style="color:#475569; font-size:0.72rem; font-style:italic;"> (edytowano)</span>

@@ -2,9 +2,10 @@
 @using GameWiki.Models
 @{
     ViewData["Title"] = "Artykuły";
-    var selectedGameId = (int?)ViewBag.SelectedGameId;
+    var selectedGameId    = (int?)ViewBag.SelectedGameId;
     var selectedGameTitle = ViewBag.SelectedGameTitle as string;
-    var gameSearch = ViewBag.GameSearch as string;
+    var gameSearch        = ViewBag.GameSearch as string;
+    bool isMod            = User.IsInRole("Admin") || User.IsInRole("Moderator");
 }
 
 <div class="gw-section">
@@ -22,22 +23,15 @@
             <p class="gw-section-sub">
                 @if (selectedGameTitle != null)
                 {
-                    <span>
-                        Filtrowanie: <strong style="color:#a78bfa;">@selectedGameTitle</strong>
-                        &nbsp;·&nbsp; <a asp-action="Index" class="gw-action-link" style="font-size:0.85rem;">Pokaż wszystkie</a>
-                    </span>
+                    <span>Filtrowanie: <strong style="color:#a78bfa;">@selectedGameTitle</strong>
+                    &nbsp;·&nbsp; <a asp-action="Index" class="gw-action-link" style="font-size:0.85rem;">Pokaż wszystkie</a></span>
                 }
                 else if (!string.IsNullOrEmpty(gameSearch))
                 {
-                    <span>
-                        Wyniki dla: <strong style="color:#a78bfa;">@gameSearch</strong>
-                        &nbsp;·&nbsp; <a asp-action="Index" class="gw-action-link" style="font-size:0.85rem;">Pokaż wszystkie</a>
-                    </span>
+                    <span>Wyniki dla: <strong style="color:#a78bfa;">@gameSearch</strong>
+                    &nbsp;·&nbsp; <a asp-action="Index" class="gw-action-link" style="font-size:0.85rem;">Pokaż wszystkie</a></span>
                 }
-                else
-                {
-                    <span>Przeglądaj wiki i poradniki</span>
-                }
+                else { <span>Przeglądaj wiki i poradniki</span> }
             </p>
         </div>
         @if (User.Identity?.IsAuthenticated == true)
@@ -58,20 +52,16 @@
         <form id="gameSearchForm" asp-action="Index" method="get"
               style="display:flex; gap:0.5rem; align-items:center; max-width:420px;">
             <div style="flex:1; position:relative;">
-                <input id="gameSearchInput"
-                       type="text"
-                       name="gameSearch"
-                       value="@gameSearch"
-                       placeholder="Szukaj po tytule gry..."
-                       autocomplete="off"
-                       style="width:100%; padding:0.45rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.12);
-                              background:rgba(255,255,255,0.06); color:#e2e8f0; font-size:0.85rem; outline:none;" />
+                <input id="gameSearchInput" type="text" name="gameSearch" value="@gameSearch"
+                       placeholder="Szukaj po tytule gry..." autocomplete="off"
+                       style="width:100%; padding:0.45rem 0.9rem; border-radius:999px;
+                              border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06);
+                              color:#e2e8f0; font-size:0.85rem; outline:none;" />
                 <ul id="gameSearchDropdown"
                     style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0;
                            background:#1e1e2e; border:1px solid rgba(255,255,255,0.12); border-radius:12px;
                            list-style:none; margin:0; padding:0.3rem 0; z-index:999;
-                           box-shadow:0 8px 24px rgba(0,0,0,0.4); overflow:hidden;">
-                </ul>
+                           box-shadow:0 8px 24px rgba(0,0,0,0.4); overflow:hidden;"></ul>
             </div>
             <button type="submit"
                     style="padding:0.45rem 1.1rem; border-radius:999px; border:none; cursor:pointer;
@@ -82,7 +72,8 @@
             {
                 <a asp-action="Index"
                    style="padding:0.45rem 0.9rem; border-radius:999px; border:1px solid rgba(255,255,255,0.12);
-                          background:transparent; color:#94a3b8; font-size:0.85rem; text-decoration:none; font-weight:600; white-space:nowrap;">
+                          background:transparent; color:#94a3b8; font-size:0.85rem;
+                          text-decoration:none; font-weight:600; white-space:nowrap;">
                     ✕ Wyczyść
                 </a>
             }
@@ -93,26 +84,7 @@
     {
         <div class="gw-auth-card" style="text-align:center; padding:3rem;">
             <div style="font-size:3rem; margin-bottom:1rem;">📭</div>
-            <p style="color:#94a3b8;">
-                @if (selectedGameTitle != null)
-                {
-                    <span>Brak artykułów dla gry <strong>@selectedGameTitle</strong>.</span>
-                }
-                else if (!string.IsNullOrEmpty(gameSearch))
-                {
-                    <span>Brak artykułów dla gier zawierających <strong>@gameSearch</strong>.</span>
-                }
-                else
-                {
-                    <span>Nie ma jeszcze żadnych artykułów.</span>
-                }
-            </p>
-            @if (User.Identity?.IsAuthenticated == true)
-            {
-                <a asp-action="Create" asp-route-gameId="@selectedGameId" class="gw-btn-primary" style="margin-top:1rem;">
-                    + Napisz artykuł
-                </a>
-            }
+            <p style="color:#94a3b8;">Nie ma jeszcze żadnych artykułów.</p>
         </div>
     }
     else
@@ -121,11 +93,13 @@
             @foreach (var article in Model)
             {
                 <div class="gw-card" style="display:flex; gap:1.2rem; padding:1.2rem; align-items:flex-start;">
+
                     <a asp-action="Details" asp-route-id="@article.Id" style="flex-shrink:0;">
                         @if (!string.IsNullOrEmpty(article.CoverImageUrl))
                         {
                             <img src="@article.CoverImageUrl" alt="Cover"
-                                 style="width:130px; height:80px; object-fit:cover; border-radius:8px; border:1px solid rgba(255,255,255,0.08);" />
+                                 style="width:130px; height:80px; object-fit:cover; border-radius:8px;
+                                        border:1px solid rgba(255,255,255,0.08);" />
                         }
                         else
                         {
@@ -143,7 +117,8 @@
 
                     <div style="flex:1; min-width:0;">
                         <a asp-action="Details" asp-route-id="@article.Id"
-                           style="font-size:1.05rem; font-weight:700; color:#e2e8f0; text-decoration:none; display:block; margin-bottom:0.35rem;">
+                           style="font-size:1.05rem; font-weight:700; color:#e2e8f0;
+                                  text-decoration:none; display:block; margin-bottom:0.35rem;">
                             @article.Title
                             @if (!article.IsVerified)
                             {
@@ -151,28 +126,26 @@
                             }
                         </a>
                         <div style="display:flex; gap:1rem; font-size:0.8rem; color:#64748b; flex-wrap:wrap;">
-                            <span>
-                                🎮 <a asp-action="Index" asp-route-gameId="@article.GameId"
-                                      style="color:#a78bfa; text-decoration:none;">@article.Game?.Title</a>
-                            </span>
+                            <span>🎮 <a asp-action="Index" asp-route-gameId="@article.GameId"
+                                       style="color:#a78bfa; text-decoration:none;">@article.Game?.Title</a></span>
                             <span>✍️ @article.Author?.Username</span>
-                            <span>🕐 @article.CreatedAt.ToString("dd.MM.yyyy")</span>
+                            <span>🕐 <span data-utc="@article.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")">@article.CreatedAt.ToString("dd.MM.yyyy")</span></span>
                         </div>
                     </div>
 
-                    @if (User.IsInRole("Admin") || User.IsInRole("Moderator"))
+                    @if (isMod)
                     {
-                        <div style="display:flex; gap:0.5rem; flex-shrink:0; align-items:center;">
+                        <div style="display:flex; gap:0.6rem; flex-shrink:0; align-items:center;">
                             <a asp-action="Edit" asp-route-id="@article.Id"
-                               class="gw-action-link gw-action-edit" style="font-size:0.82rem;">Edytuj</a>
-                            <form asp-action="Delete" asp-route-id="@article.Id" method="post" style="margin:0;"
-                                  onsubmit="return confirm('Usunąć artykuł?');">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="gw-action-link gw-action-delete"
-                                        style="background:none;border:none;cursor:pointer;font-size:0.82rem;padding:0;">
-                                    Usuń
-                                </button>
-                            </form>
+                               class="gw-action-link gw-action-edit" style="font-size:0.82rem;">✏️ Edytuj</a>
+                            <button type="button"
+                                    class="gw-action-link gw-action-delete"
+                                    style="background:none; border:none; cursor:pointer; font-size:0.82rem; padding:0;"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#deleteArticleListModal"
+                                    data-delete-url="/Article/Delete/@article.Id">
+                                🗑️ Usuń
+                            </button>
                         </div>
                     }
                 </div>
@@ -207,7 +180,7 @@
                     li.style.cssText = 'padding:0.5rem 1rem;cursor:pointer;font-size:0.85rem;color:#e2e8f0;transition:background 0.15s;';
                     li.addEventListener('mouseenter', () => li.style.background = 'rgba(99,102,241,0.2)');
                     li.addEventListener('mouseleave', () => li.style.background = 'transparent');
-                    li.addEventListener('mousedown', (e) => { e.preventDefault(); input.value = game.title; hideDropdown(); form.submit(); });
+                    li.addEventListener('mousedown', e => { e.preventDefault(); input.value = game.title; hideDropdown(); form.submit(); });
                     dropdown.appendChild(li);
                 });
                 dropdown.style.display = 'block';
@@ -215,21 +188,17 @@
         }
 
         function hideDropdown() { dropdown.style.display = 'none'; dropdown.innerHTML = ''; }
-
-        document.addEventListener('click', function (e) {
-            if (!input.contains(e.target) && !dropdown.contains(e.target)) hideDropdown();
-        });
+        document.addEventListener('click', e => { if (!input.contains(e.target) && !dropdown.contains(e.target)) hideDropdown(); });
 
         let activeIndex = -1;
         input.addEventListener('keydown', function (e) {
             const items = dropdown.querySelectorAll('li');
             if (!items.length) return;
-            if (e.key === 'ArrowDown') { e.preventDefault(); activeIndex = Math.min(activeIndex + 1, items.length - 1); updateActive(items); }
+            if (e.key === 'ArrowDown')  { e.preventDefault(); activeIndex = Math.min(activeIndex + 1, items.length - 1); updateActive(items); }
             else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = Math.max(activeIndex - 1, -1); updateActive(items); }
             else if (e.key === 'Enter' && activeIndex >= 0) { e.preventDefault(); input.value = items[activeIndex].textContent; hideDropdown(); form.submit(); }
             else if (e.key === 'Escape') { hideDropdown(); activeIndex = -1; }
         });
-
         function updateActive(items) {
             items.forEach((item, i) => { item.style.background = i === activeIndex ? 'rgba(99,102,241,0.2)' : 'transparent'; });
             if (activeIndex >= 0) input.value = items[activeIndex].textContent;

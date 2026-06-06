@@ -1,4 +1,4 @@
-﻿namespace GameWiki.DTOs.Review
+namespace GameWiki.DTOs.Review
 {
     public class ReviewDto
     {

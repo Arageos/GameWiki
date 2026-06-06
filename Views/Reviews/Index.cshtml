@@ -91,7 +91,7 @@
                                 }
                             </div>
                             <span class="gw-review-date">
-                                @review.CreatedAt.ToString("dd.MM.yyyy")
+                                <span data-utc="@review.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")">@review.CreatedAt.ToString("dd.MM.yyyy")</span>
                             </span>
                         </div>
 

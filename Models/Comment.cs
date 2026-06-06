@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace GameWiki.Models
 {
@@ -13,7 +13,7 @@ namespace GameWiki.Models
         [Required]
         [MaxLength(2000)]
         public string Content { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime? UpdatedAt { get; set; }
         public int? ParentCommentId { get; set; }
         public Comment ParentComment { get; set; }

@@ -57,6 +57,7 @@
                 };
 
                 var displayTime = n.CreatedAt.ToString("dd.MM.yyyy HH:mm");
+                var utcAttr    = n.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss");
 
                 <div class="p-4 rounded-3 @(n.IsRead ? "" : "fw-semibold")"
                      style="background:@bgColor; border:1px solid @borderColor; border-left:4px solid @borderColor; opacity:@(n.IsRead ? "0.65" : "1");">

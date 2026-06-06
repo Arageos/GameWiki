@@ -1,4 +1,4 @@
-﻿using GameWiki.DTOs.Review;
+using GameWiki.DTOs.Review;
 using GameWiki.Models;
 using GameWiki.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -104,7 +104,15 @@ namespace GameWiki.Controllers
                 return RedirectToAction("Details", "Games", new { id = dto.GameId });
             }
 
-            bool isMod = User.IsInRole("Admin") || User.IsInRole("Moderator");
+            var userRoleName = await _context.UserRoles
+                .Include(ur => ur.Role)
+                .Where(ur => ur.UserId == userId)
+                .Select(ur => ur.Role.Name)
+                .FirstOrDefaultAsync();
+
+            bool isMod = User.IsInRole("Admin") || User.IsInRole("Moderator")
+                      || userRoleName == "Admin" || userRoleName == "Moderator";
+
             bool hasContent = !string.IsNullOrWhiteSpace(dto.Content);
 
             bool isVerified = isMod || !hasContent;
@@ -116,7 +124,7 @@ namespace GameWiki.Controllers
                 Rating = dto.Rating,
                 Content = dto.Content,
                 IsVerified = isVerified,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             };
 
             _context.Reviews.Add(review);
@@ -128,7 +136,7 @@ namespace GameWiki.Controllers
                 var game = await _context.Games.FindAsync(dto.GameId);
                 await _articleService.NotifyModsAsync(
                     NotificationType.NewReview,
-                    $"Nowa recenzja do weryfikacji — gra: {game?.Title}, autor: { author?.Username}",
+                    $"Nowa recenzja do weryfikacji — gra: {game?.Title}, autor: {author?.Username}",
                     "/Admin/PendingReviews"
                 );
                 await _context.SaveChangesAsync();
@@ -201,7 +209,7 @@ namespace GameWiki.Controllers
                     Type = NotificationType.ContentEdited,
                     Message = $"Twoja recenzja gry {review.Game?.Title} została zedytowana przez moderację.",
                     ActionUrl = $"/Reviews/Index?gameId={review.GameId}",
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.Now
                 });
             }
 
@@ -251,7 +259,7 @@ namespace GameWiki.Controllers
                 Type = NotificationType.ContentRemoved,
                 Message = $"Twoja recenzja gry {review.Game?.Title} została usunięta przez moderację.",
                 Reason = string.IsNullOrWhiteSpace(deleteReason) ? "Naruszenie regulaminu." : deleteReason,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             });
 
             await RemoveReviewAsync(review);

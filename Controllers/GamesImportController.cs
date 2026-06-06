@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GameWiki.Models;
@@ -23,7 +23,7 @@ namespace GameWiki.Controllers
         public async Task<IActionResult> Index(int page = 1, string search = "")
         {
             var result = await _rawg.GetGamesAsync(page, 20, search);
-            ViewBag.Page = page;
+            ViewBag.Page   = page;
             ViewBag.Search = search;
             ViewBag.HasNext = result.Next != null;
             return View(result.Results);
@@ -48,14 +48,14 @@ namespace GameWiki.Controllers
 
             var game = new Game
             {
-                Title = details.Name,
-                Description = details.DescriptionRaw ?? "Brak opisu.",
-                ReleaseDate = releaseDate,
-                BackgroundImage = details.BackgroundImage,
-                RawgRating = details.Rating,
+                Title            = details.Name,
+                Description      = details.DescriptionRaw ?? "Brak opisu.",
+                ReleaseDate      = releaseDate,
+                BackgroundImage  = details.BackgroundImage,
+                RawgRating       = details.Rating,
                 RawgRatingsCount = details.RatingsCount,
-                GameGenres = new List<GameGenre>(),
-                GamePlatforms = new List<GamePlatform>()
+                GameGenres       = new List<GameGenre>(),
+                GamePlatforms    = new List<GamePlatform>()
             };
 
             if (details.Genres != null)

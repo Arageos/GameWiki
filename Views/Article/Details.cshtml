@@ -18,7 +18,7 @@
                 <h1 class="gw-details-title">@Model.Title</h1>
                 <span class="gw-details-date">
                     @Model.Game?.Title &nbsp;·&nbsp; ✍️ @Model.Author?.Username
-                    &nbsp;·&nbsp; @Model.CreatedAt.ToString("dd.MM.yyyy")
+                    &nbsp;·&nbsp; <span data-utc="@Model.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")">@Model.CreatedAt.ToString("dd.MM.yyyy")</span>
                     @if (!Model.IsVerified)
                     {
                         <span class="badge bg-warning text-dark ms-2" style="font-size:0.7rem;">Oczekuje na weryfikację</span>

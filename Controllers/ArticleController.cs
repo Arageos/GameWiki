@@ -1,4 +1,4 @@
-﻿using GameWiki.DTOs.Article;
+using GameWiki.DTOs.Article;
 using GameWiki.Models;
 using GameWiki.Services;
 using Microsoft.AspNetCore.Authorization;

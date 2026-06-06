@@ -1,4 +1,4 @@
-﻿using GameWiki.Models;
+using GameWiki.Models;
 using GameWiki.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -34,15 +34,14 @@ namespace GameWiki.Controllers
             var report = new Report
             {
                 ReporterId = userId,
-                Type = type,
-                TargetId = targetId,
-                Reason = reason,
-                CreatedAt = DateTime.UtcNow
+                Type       = type,
+                TargetId   = targetId,
+                Reason     = reason,
+                CreatedAt  = DateTime.Now
             };
             _context.Reports.Add(report);
             await _context.SaveChangesAsync();
 
-            // Powiadom wszystkich Admin/Mod przez UserNotification (widoczne w dzwonku)
             await _articleService.NotifyModsAsync(
                 NotificationType.NewReport,
                 $"Nowe zgłoszenie ({type}) od użytkownika {User.Identity?.Name}: {reason.Substring(0, Math.Min(reason.Length, 60))}{(reason.Length > 60 ? "…" : "")}",
@@ -63,13 +62,12 @@ namespace GameWiki.Controllers
 
             var appeal = new Appeal
             {
-                UserId = user.Id,
+                UserId  = user.Id,
                 Subject = "Odwołanie od blokady konta",
                 Message = message
             };
             _context.Appeals.Add(appeal);
 
-            // Powiadom moderatorów
             await _articleService.NotifyModsAsync(
                 NotificationType.NewReport,
                 $"Nowe odwołanie od zbanowanego użytkownika {user.Username}.",
@@ -96,7 +94,7 @@ namespace GameWiki.Controllers
 
             var appeal = new Appeal
             {
-                UserId = userId,
+                UserId  = userId,
                 Subject = subject ?? "Odwołanie od decyzji administracji",
                 Message = message
             };

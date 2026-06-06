@@ -1,4 +1,4 @@
-﻿using GameWiki.DTOs.Admin;
+using GameWiki.DTOs.Admin;
 using GameWiki.Models;
 using GameWiki.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -152,7 +152,7 @@ namespace GameWiki.Controllers
                 Type = NotificationType.ContentEdited,
                 Message = "Twoja recenzja została zweryfikowana i jest teraz widoczna publicznie.",
                 ActionUrl = $"/Reviews/Index?gameId={review.GameId}",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             });
 
             await _context.SaveChangesAsync();
@@ -176,10 +176,9 @@ namespace GameWiki.Controllers
                 Type = NotificationType.ContentRemoved,
                 Message = $"Twoja recenzja gry {review.Game?.Title} została odrzucona przez moderację.",
                 Reason = string.IsNullOrWhiteSpace(deleteReason) ? "Treść nie spełnia wymogów serwisu." : deleteReason,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.Now
             });
 
-            // Zamknij powiązane zgłoszenia
             var reports = await _context.Reports
                 .Where(r => r.Type == ReportType.Review && r.TargetId == reviewId && r.Status == ReportStatus.Pending)
                 .ToListAsync();
@@ -192,7 +191,6 @@ namespace GameWiki.Controllers
             return RedirectToAction(nameof(PendingReviews));
         }
 
-        // ── Zgłoszenia ───────────────────────────────────────────────────────
         public async Task<IActionResult> Reports()
         {
             var reports = await _context.Reports
@@ -208,8 +206,8 @@ namespace GameWiki.Controllers
                 {
                     ReportType.Article => await _context.Articles.AnyAsync(a => a.Id == r.TargetId),
                     ReportType.Comment => await _context.Comments.AnyAsync(c => c.Id == r.TargetId),
-                    ReportType.Review => await _context.Reviews.AnyAsync(rv => rv.Id == r.TargetId),
-                    _ => true
+                    ReportType.Review  => await _context.Reviews.AnyAsync(rv => rv.Id == r.TargetId),
+                    _                  => true
                 };
 
                 if (!targetExists)
@@ -227,24 +225,24 @@ namespace GameWiki.Controllers
             {
                 var dto = new ReportItemDto
                 {
-                    ReportId = r.Id,
+                    ReportId   = r.Id,
                     ReporterName = r.Reporter.Username,
-                    Type = r.Type,
-                    TargetId = r.TargetId,
-                    Reason = r.Reason,
-                    CreatedAt = r.CreatedAt
+                    Type       = r.Type,
+                    TargetId   = r.TargetId,
+                    Reason     = r.Reason,
+                    CreatedAt  = r.CreatedAt
                 };
 
                 if (r.Type == ReportType.Comment)
                 {
                     var comment = await _context.Comments.Include(c => c.User).FirstOrDefaultAsync(c => c.Id == r.TargetId);
-                    dto.ContentText = comment?.Content ?? "[Treść usunięta]";
+                    dto.ContentText       = comment?.Content ?? "[Treść usunięta]";
                     dto.ContentAuthorName = comment?.User?.Username ?? "Nieznany";
                 }
                 else if (r.Type == ReportType.Review)
                 {
                     var review = await _context.Reviews.Include(rv => rv.User).FirstOrDefaultAsync(rv => rv.Id == r.TargetId);
-                    dto.ContentText = review?.Content ?? "[Treść usunięta]";
+                    dto.ContentText       = review?.Content ?? "[Treść usunięta]";
                     dto.ContentAuthorName = review?.User?.Username ?? "Nieznany";
                 }
 
@@ -303,10 +301,10 @@ namespace GameWiki.Controllers
                     _context.UserNotifications.Add(new UserNotification
                     {
                         UserId = contentAuthorId.Value,
-                        Type = NotificationType.ContentRemoved,
+                        Type   = NotificationType.ContentRemoved,
                         Message = $"{contentLabel} została usunięta przez moderację.",
-                        Reason = string.IsNullOrWhiteSpace(deleteReason) ? "Naruszenie regulaminu." : deleteReason,
-                        CreatedAt = DateTime.UtcNow
+                        Reason  = string.IsNullOrWhiteSpace(deleteReason) ? "Naruszenie regulaminu." : deleteReason,
+                        CreatedAt = DateTime.Now
                     });
                 }
 

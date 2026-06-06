@@ -1,4 +1,4 @@
-﻿using GameWiki.DTOs.Game;
+using GameWiki.DTOs.Game;
 using GameWiki.Models;
 using GameWiki.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -65,7 +65,7 @@ namespace GameWiki.Controllers
 
             var game = new Game
             {
-                Title = dto.Title,
+                Title       = dto.Title,
                 Description = dto.Description,
                 ReleaseDate = dto.ReleaseDate
             };
@@ -92,8 +92,8 @@ namespace GameWiki.Controllers
 
             return View(new UpdateGameDto
             {
-                Id = game.Id,
-                Title = game.Title,
+                Id          = game.Id,
+                Title       = game.Title,
                 Description = game.Description,
                 ReleaseDate = game.ReleaseDate
             });
@@ -110,7 +110,7 @@ namespace GameWiki.Controllers
             var game = await _context.Games.FindAsync(id);
             if (game == null) return NotFound();
 
-            game.Title = dto.Title;
+            game.Title       = dto.Title;
             game.Description = dto.Description;
             game.ReleaseDate = dto.ReleaseDate;
             await _context.SaveChangesAsync();

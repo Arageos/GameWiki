@@ -1,17 +1,21 @@
-﻿@model IEnumerable<GameWiki.Models.Appeal>
+@using GameWiki.Models
+@model IEnumerable<Appeal>
 @{
-    ViewData["Title"] = "Panel Odwołań";
+    ViewData["Title"] = "Odwołania użytkowników";
 }
 
 <div class="container py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="text-white fw-bold">⚖️ Odwołania użytkowników</h2>
-        <a asp-action="Index" class="btn btn-outline-light">Wróć do Panelu</a>
+        <div>
+            <h2 class="text-white fw-bold">⚖️ Odwołania użytkowników</h2>
+            <p style="color:#64748b; margin:0; font-size:0.88rem;">Odwołania oczekujące na rozpatrzenie</p>
+        </div>
+        <a asp-controller="Admin" asp-action="Index" class="gw-btn-outline" style="font-size:0.88rem;">← Panel admina</a>
     </div>
 
     @if (TempData["SuccessMessage"] != null)
     {
-        <div class="alert alert-success alert-dismissible fade show">
+        <div class="alert alert-success alert-dismissible fade show mb-4">
             @TempData["SuccessMessage"]
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
@@ -19,45 +23,63 @@
 
     @if (!Model.Any())
     {
-        <div class="alert text-center" style="background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px dashed rgba(255,255,255,0.2);">
-            Brak oczekujących odwołań. Wszystko jest na bieżąco!
+        <div class="gw-auth-card" style="text-align:center; padding:3rem;">
+            <div style="font-size:3rem; margin-bottom:1rem;">✅</div>
+            <p style="color:#94a3b8;">Brak oczekujących odwołań.</p>
         </div>
     }
     else
     {
-        <div class="row">
+        <div style="display:flex; flex-direction:column; gap:1rem;">
             @foreach (var appeal in Model)
             {
-                <div class="col-12 mb-4">
-                    <div class="gw-card p-4" style="background: #1a1d26; border-radius: 12px; border-left: 4px solid #0dcaf0;">
-                        <div class="d-flex justify-content-between mb-3 border-bottom border-secondary pb-2">
-                            <div>
-                                <span class="badge bg-info text-dark me-2">@appeal.Subject</span>
-                                <span class="text-muted small">
-                                    Odwołujący się: <strong class="text-light">@appeal.User.Username</strong>
-                                    &nbsp;·&nbsp; @appeal.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                <div class="gw-card p-4" style="background:#1a1d26; border-radius:12px;
+                            border-left:4px solid #6366f1; border:1px solid rgba(255,255,255,0.1);">
+
+                    <div class="d-flex justify-content-between mb-3 pb-2"
+                         style="border-bottom:1px solid rgba(255,255,255,0.07); flex-wrap:wrap; gap:0.5rem;">
+                        <div style="display:flex; align-items:center; gap:0.7rem; flex-wrap:wrap;">
+                            <span class="badge" style="background:#6366f1; font-size:0.75rem;">@appeal.Subject</span>
+                            <span style="color:#94a3b8; font-size:0.85rem;">
+                                Odwołujący się: <strong style="color:#e2e8f0;">@appeal.User?.Username</strong>
+                                &nbsp;·&nbsp;
+                                <span data-utc="@appeal.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss")" data-utc-format="dt">
+                                    @appeal.CreatedAt.ToString("dd.MM.yyyy HH:mm")
                                 </span>
-                            </div>
+                            </span>
                         </div>
+                    </div>
 
-                        <div class="mb-4">
-                            <span class="text-uppercase small fw-bold" style="color: #94a3b8;">Treść odwołania:</span>
-                            <p class="text-white fst-italic mt-1">"@appeal.Message"</p>
-                        </div>
+                    <div class="mb-4">
+                        <span style="color:#94a3b8; font-size:0.78rem; text-transform:uppercase;
+                                     font-weight:600; letter-spacing:0.05em;">Treść odwołania:</span>
+                        <p style="color:#e2e8f0; font-style:italic; margin-top:0.4rem; margin-bottom:0;
+                                  padding:0.8rem; background:rgba(0,0,0,0.2); border-radius:8px;
+                                  border-left:3px solid #6366f1;">
+                            „@appeal.Message"
+                        </p>
+                    </div>
 
-                        <div class="d-flex gap-2">
-                            <form asp-action="HandleAppeal" method="post" class="m-0">
-                                <input type="hidden" name="appealId" value="@appeal.Id" />
-                                <input type="hidden" name="actionType" value="approve" />
-                                <button type="submit" class="btn btn-success btn-sm">Akceptuj i zamknij bilet</button>
-                            </form>
-
-                            <form asp-action="HandleAppeal" method="post" class="m-0">
-                                <input type="hidden" name="appealId" value="@appeal.Id" />
-                                <input type="hidden" name="actionType" value="reject" />
-                                <button type="submit" class="btn btn-outline-danger btn-sm">Odrzuć odwołanie</button>
-                            </form>
-                        </div>
+                    <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+                        <form asp-action="HandleAppeal" method="post" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="appealId" value="@appeal.Id" />
+                            <input type="hidden" name="actionType" value="approve" />
+                            <button type="submit" class="btn btn-sm"
+                                    style="background:#22c55e; color:#fff; border:none; border-radius:8px; padding:0.4rem 1rem; font-weight:600;">
+                                ✅ Akceptuj i zamknij bilet
+                            </button>
+                        </form>
+                        <form asp-action="HandleAppeal" method="post" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="appealId" value="@appeal.Id" />
+                            <input type="hidden" name="actionType" value="reject" />
+                            <button type="submit" class="btn btn-sm"
+                                    style="background:none; color:#f87171; border:1px solid #f87171;
+                                           border-radius:8px; padding:0.4rem 1rem; font-weight:600;">
+                                ❌ Odrzuć odwołanie
+                            </button>
+                        </form>
                     </div>
                 </div>
             }

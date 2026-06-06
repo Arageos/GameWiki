@@ -1,4 +1,4 @@
-﻿namespace GameWiki.Models
+namespace GameWiki.Models
 {
     public enum NotificationType
     {
@@ -22,6 +22,6 @@
         public string? Reason { get; set; }
         public string? ActionUrl { get; set; }
         public bool IsRead { get; set; } = false;
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
     }
 }
