@@ -28,6 +28,8 @@ builder.Services.AddScoped<ReviewService>();
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<FavoriteService>();
 builder.Services.AddScoped<GameService>();
+builder.Services.AddScoped<AdminService>();
+builder.Services.AddScoped<ReportService>();
 
 var app = builder.Build();
 

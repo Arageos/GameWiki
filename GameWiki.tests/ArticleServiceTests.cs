@@ -21,7 +21,13 @@ public class ArticleServiceTests
     {
         var mockEnv = new Mock<IWebHostEnvironment>();
         mockEnv.Setup(e => e.WebRootPath).Returns(Path.GetTempPath());
-        return new ArticleService(db, mockEnv.Object);
+
+        var notifications = new NotificationService(db);
+
+        return new ArticleService(
+            db,
+            mockEnv.Object,
+            notifications);
     }
 
     private async Task<(User user, Game game)> SeedUserAndGameAsync(GameWikiDbContext db)

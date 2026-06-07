@@ -2,7 +2,6 @@ using GameWiki.Models;
 using GameWiki.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace GameWiki.Controllers
@@ -10,13 +9,11 @@ namespace GameWiki.Controllers
     [Authorize]
     public class ReportsController : Controller
     {
-        private readonly GameWikiDbContext _context;
-        private readonly NotificationService _notifications;
+        private readonly ReportService _reports;
 
-        public ReportsController(GameWikiDbContext context, NotificationService notifications)
+        public ReportsController(ReportService reports)
         {
-            _context       = context;
-            _notifications = notifications;
+            _reports = reports;
         }
 
         [HttpPost]
@@ -29,23 +26,7 @@ namespace GameWiki.Controllers
             }
 
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-
-            _context.Reports.Add(new Report
-            {
-                ReporterId = userId,
-                Type       = type,
-                TargetId   = targetId,
-                Reason     = reason,
-                CreatedAt  = DateTime.UtcNow
-            });
-            await _context.SaveChangesAsync();
-
-            await _notifications.NotifyModsAsync(
-                NotificationType.NewReport,
-                $"Nowe zgłoszenie ({type}) od {User.Identity?.Name}: {reason.Substring(0, Math.Min(reason.Length, 60))}{(reason.Length > 60 ? "…" : "")}",
-                "/Admin/Reports"
-            );
-            await _context.SaveChangesAsync();
+            await _reports.CreateReportAsync(userId, User.Identity?.Name ?? "", type, targetId, reason);
 
             TempData["SuccessMessage"] = "Zgłoszenie wysłane do administracji. Dziękujemy!";
             return Redirect(returnUrl ?? "/");
@@ -55,23 +36,9 @@ namespace GameWiki.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> AppealBan(string email, string message)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null || !user.IsBanned) return RedirectToAction("Login", "Account");
+            var success = await _reports.AppealBanAsync(email, message);
+            if (!success) return RedirectToAction("Login", "Account");
 
-            _context.Appeals.Add(new Appeal
-            {
-                UserId  = user.Id,
-                Subject = "Odwołanie od blokady konta",
-                Message = message
-            });
-
-            await _notifications.NotifyModsAsync(
-                NotificationType.NewReport,
-                $"Nowe odwołanie od zbanowanego użytkownika {user.Username}.",
-                "/Admin/Appeals"
-            );
-
-            await _context.SaveChangesAsync();
             TempData["SuccessMessage"] = "Odwołanie wysłane. Administracja wkrótce je rozpatrzy.";
             return RedirectToAction("Login", "Account");
         }
@@ -86,21 +53,8 @@ namespace GameWiki.Controllers
             }
 
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            await _reports.CreateAppealAsync(userId, User.Identity?.Name ?? "", subject, message);
 
-            _context.Appeals.Add(new Appeal
-            {
-                UserId  = userId,
-                Subject = subject ?? "Odwołanie od decyzji administracji",
-                Message = message
-            });
-
-            await _notifications.NotifyModsAsync(
-                NotificationType.NewReport,
-                $"Nowe odwołanie od użytkownika {User.Identity?.Name}.",
-                "/Admin/Appeals"
-            );
-
-            await _context.SaveChangesAsync();
             TempData["SuccessMessage"] = "Odwołanie wysłane. Administracja wkrótce się nim zajmie.";
             return Redirect(returnUrl ?? "/Account/Notifications");
         }
