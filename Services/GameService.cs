@@ -73,5 +73,13 @@ namespace GameWiki.Services
                 .Take(10)
                 .ToListAsync();
         }
+
+        public async Task<Game?> GetGameByIdAsync(int id)
+        {
+            return await _context.Games
+                .Include(g => g.GameGenres).ThenInclude(gg => gg.Genre)
+                .Include(g => g.GamePlatforms).ThenInclude(gp => gp.Platform)
+                .FirstOrDefaultAsync(g => g.Id == id);
+        }
     }
 }
