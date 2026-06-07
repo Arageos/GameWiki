@@ -11,12 +11,12 @@ namespace GameWiki.Controllers
     public class ReportsController : Controller
     {
         private readonly GameWikiDbContext _context;
-        private readonly ArticleService _articleService;
+        private readonly NotificationService _notifications;
 
-        public ReportsController(GameWikiDbContext context, ArticleService articleService)
+        public ReportsController(GameWikiDbContext context, NotificationService notifications)
         {
-            _context = context;
-            _articleService = articleService;
+            _context       = context;
+            _notifications = notifications;
         }
 
         [HttpPost]
@@ -28,28 +28,26 @@ namespace GameWiki.Controllers
                 return Redirect(returnUrl ?? "/");
             }
 
-            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(userIdStr, out int userId)) return RedirectToAction("Login", "Account");
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-            var report = new Report
+            _context.Reports.Add(new Report
             {
                 ReporterId = userId,
                 Type       = type,
                 TargetId   = targetId,
                 Reason     = reason,
-                CreatedAt  = DateTime.Now
-            };
-            _context.Reports.Add(report);
+                CreatedAt  = DateTime.UtcNow
+            });
             await _context.SaveChangesAsync();
 
-            await _articleService.NotifyModsAsync(
+            await _notifications.NotifyModsAsync(
                 NotificationType.NewReport,
-                $"Nowe zgłoszenie ({type}) od użytkownika {User.Identity?.Name}: {reason.Substring(0, Math.Min(reason.Length, 60))}{(reason.Length > 60 ? "…" : "")}",
+                $"Nowe zgłoszenie ({type}) od {User.Identity?.Name}: {reason.Substring(0, Math.Min(reason.Length, 60))}{(reason.Length > 60 ? "…" : "")}",
                 "/Admin/Reports"
             );
             await _context.SaveChangesAsync();
 
-            TempData["SuccessMessage"] = "Zgłoszenie zostało wysłane do administracji. Dziękujemy!";
+            TempData["SuccessMessage"] = "Zgłoszenie wysłane do administracji. Dziękujemy!";
             return Redirect(returnUrl ?? "/");
         }
 
@@ -60,23 +58,21 @@ namespace GameWiki.Controllers
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
             if (user == null || !user.IsBanned) return RedirectToAction("Login", "Account");
 
-            var appeal = new Appeal
+            _context.Appeals.Add(new Appeal
             {
                 UserId  = user.Id,
                 Subject = "Odwołanie od blokady konta",
                 Message = message
-            };
-            _context.Appeals.Add(appeal);
+            });
 
-            await _articleService.NotifyModsAsync(
+            await _notifications.NotifyModsAsync(
                 NotificationType.NewReport,
                 $"Nowe odwołanie od zbanowanego użytkownika {user.Username}.",
                 "/Admin/Appeals"
             );
 
             await _context.SaveChangesAsync();
-
-            TempData["SuccessMessage"] = "Twoje odwołanie zostało wysłane. Administracja wkrótce je rozpatrzy.";
+            TempData["SuccessMessage"] = "Odwołanie wysłane. Administracja wkrótce je rozpatrzy.";
             return RedirectToAction("Login", "Account");
         }
 
@@ -89,26 +85,23 @@ namespace GameWiki.Controllers
                 return Redirect(returnUrl ?? "/Account/Notifications");
             }
 
-            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!int.TryParse(userIdStr, out int userId)) return RedirectToAction("Login", "Account");
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-            var appeal = new Appeal
+            _context.Appeals.Add(new Appeal
             {
                 UserId  = userId,
                 Subject = subject ?? "Odwołanie od decyzji administracji",
                 Message = message
-            };
-            _context.Appeals.Add(appeal);
+            });
 
-            await _articleService.NotifyModsAsync(
+            await _notifications.NotifyModsAsync(
                 NotificationType.NewReport,
                 $"Nowe odwołanie od użytkownika {User.Identity?.Name}.",
                 "/Admin/Appeals"
             );
 
             await _context.SaveChangesAsync();
-
-            TempData["SuccessMessage"] = "Twoje odwołanie zostało wysłane. Administracja wkrótce się nim zajmie.";
+            TempData["SuccessMessage"] = "Odwołanie wysłane. Administracja wkrótce się nim zajmie.";
             return Redirect(returnUrl ?? "/Account/Notifications");
         }
     }

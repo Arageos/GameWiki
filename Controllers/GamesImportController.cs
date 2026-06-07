@@ -11,31 +11,30 @@ namespace GameWiki.Controllers
     {
         private readonly RawgService _rawg;
         private readonly GameWikiDbContext _context;
-        private readonly ArticleService _articleService;
+        private readonly NotificationService _notifications;
 
-        public GamesImportController(RawgService rawg, GameWikiDbContext context, ArticleService articleService)
+        public GamesImportController(RawgService rawg, GameWikiDbContext context, NotificationService notifications)
         {
-            _rawg = rawg;
-            _context = context;
-            _articleService = articleService;
+            _rawg          = rawg;
+            _context       = context;
+            _notifications = notifications;
         }
 
         public async Task<IActionResult> Index(int page = 1, string search = "")
         {
             var result = await _rawg.GetGamesAsync(page, 20, search);
-            ViewBag.Page   = page;
-            ViewBag.Search = search;
+            ViewBag.Page    = page;
+            ViewBag.Search  = search;
             ViewBag.HasNext = result.Next != null;
             return View(result.Results);
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> Import(int rawgId)
         {
             var details = await _rawg.GetGameDetailsAsync(rawgId);
+            var exists  = await _context.Games.AnyAsync(g => g.Title == details.Name);
 
-            var exists = await _context.Games.AnyAsync(g => g.Title == details.Name);
             if (exists)
             {
                 TempData["ImportError"] = $"Gra \"{details.Name}\" już istnieje w bazie.";
@@ -84,7 +83,7 @@ namespace GameWiki.Controllers
             _context.Games.Add(game);
             await _context.SaveChangesAsync();
 
-            await _articleService.NotifyModsAsync(
+            await _notifications.NotifyModsAsync(
                 NotificationType.NewGame,
                 $"Zaimportowano nową grę z RAWG: {game.Title}.",
                 $"/Games/Details/{game.Id}"

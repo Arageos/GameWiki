@@ -138,6 +138,8 @@
                    border-top: 1px solid rgba(255,255,255,0.07); color: #475569; padding: 1.5rem 0;">
         <div class="container">
             &copy; 2026 - GameWiki
+            &nbsp;·&nbsp;
+            <a asp-controller="Home" asp-action="Terms" style="color:#475569; text-decoration:none; font-size:0.85rem;" onmouseover="this.style.color='#94a3b8'" onmouseout="this.style.color='#475569'">Regulamin</a>
         </div>
 
         <div class="modal fade" id="reportModal" tabindex="-1" aria-hidden="true">
@@ -237,6 +239,7 @@
         });
     </script>
 
+    @await Html.PartialAsync("_CookieConsent")
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

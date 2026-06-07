@@ -32,4 +32,8 @@
         <Content Remove="GameWiki.tests\**" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Include="Views\Shared\_CookieConsent.cshtml" />
+    </ItemGroup>
+
 </Project>

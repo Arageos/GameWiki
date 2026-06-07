@@ -8,35 +8,21 @@ namespace GameWiki.Services
     {
         private readonly GameWikiDbContext _context;
         private readonly IWebHostEnvironment _env;
+        private readonly NotificationService _notifications;
 
-        public ArticleService(GameWikiDbContext context, IWebHostEnvironment env)
+        public ArticleService(GameWikiDbContext context, IWebHostEnvironment env,
+                              NotificationService notifications)
         {
-            _context = context;
-            _env = env;
+            _context       = context;
+            _env           = env;
+            _notifications = notifications;
         }
 
-        public async Task NotifyModsAsync(NotificationType type, string message, string? actionUrl = null)
-        {
-            var modAdminIds = await _context.UserRoles
-                .Include(ur => ur.Role)
-                .Where(ur => ur.Role.Name == "Admin" || ur.Role.Name == "Moderator")
-                .Select(ur => ur.UserId)
-                .ToListAsync();
+        public Task NotifyModsAsync(NotificationType type, string message, string? actionUrl = null)
+            => _notifications.NotifyModsAsync(type, message, actionUrl);
 
-            foreach (var uid in modAdminIds)
-            {
-                _context.UserNotifications.Add(new UserNotification
-                {
-                    UserId = uid,
-                    Type = type,
-                    Message = message,
-                    ActionUrl = actionUrl,
-                    CreatedAt = DateTime.Now
-                });
-            }
-        }
-
-        public async Task<(List<Article> Articles, string? SelectedGameTitle)> GetArticlesAsync(int? gameId, string? gameSearch)
+        public async Task<(List<Article> Articles, string? SelectedGameTitle)>
+            GetArticlesAsync(int? gameId, string? gameSearch)
         {
             var query = _context.Articles
                 .Include(a => a.Author)
@@ -58,8 +44,7 @@ namespace GameWiki.Services
                 query = query.Where(a => a.Game.Title.Contains(gameSearch));
             }
 
-            var articles = await query.OrderByDescending(a => a.CreatedAt).ToListAsync();
-            return (articles, selectedGameTitle);
+            return (await query.OrderByDescending(a => a.CreatedAt).ToListAsync(), selectedGameTitle);
         }
 
         public async Task<Article?> GetArticleWithDetailsAsync(int id)
@@ -94,11 +79,11 @@ namespace GameWiki.Services
         {
             var article = new Article
             {
-                GameId = dto.GameId,
-                AuthorId = authorId,
-                Title = dto.Title,
+                GameId     = dto.GameId,
+                AuthorId   = authorId,
+                Title      = dto.Title,
                 IsVerified = isVerified,
-                CreatedAt = DateTime.Now
+                CreatedAt  = DateTime.UtcNow
             };
 
             if (dto.CoverImage != null && dto.CoverImage.Length > 0)
@@ -113,10 +98,10 @@ namespace GameWiki.Services
             if (!isVerified)
             {
                 var author = await _context.Users.FindAsync(authorId);
-                await NotifyModsAsync(
+                await _notifications.NotifyModsAsync(
                     NotificationType.NewArticle,
                     $"Nowy artykuł do weryfikacji: {article.Title} — autor: {author?.Username}",
-                    $"/Admin/PendingArticles"
+                    "/Admin/PendingArticles"
                 );
                 await _context.SaveChangesAsync();
             }
@@ -133,8 +118,8 @@ namespace GameWiki.Services
 
         public async Task UpdateArticleAsync(Article article, EditArticleDto dto)
         {
-            article.Title = dto.Title;
-            article.UpdatedAt = DateTime.Now;
+            article.Title     = dto.Title;
+            article.UpdatedAt = DateTime.UtcNow;
 
             if (dto.CoverImage != null && dto.CoverImage.Length > 0)
                 article.CoverImageUrl = await SaveImageAsync(dto.CoverImage);
@@ -150,14 +135,12 @@ namespace GameWiki.Services
 
             if (article.AuthorId != editorId)
             {
-                _context.UserNotifications.Add(new UserNotification
-                {
-                    UserId = article.AuthorId,
-                    Type = NotificationType.ContentEdited,
-                    Message = $"Twój artykuł {article.Title} został zedytowany przez moderację.",
-                    ActionUrl = $"/Article/Details/{article.Id}",
-                    CreatedAt = DateTime.Now
-                });
+                _notifications.NotifyUser(
+                    article.AuthorId,
+                    NotificationType.ContentEdited,
+                    $"Twój artykuł {article.Title} został zedytowany przez moderację.",
+                    actionUrl: $"/Article/Details/{article.Id}"
+                );
                 await _context.SaveChangesAsync();
             }
         }
@@ -166,14 +149,12 @@ namespace GameWiki.Services
         {
             if (moderatorId.HasValue && article.AuthorId != moderatorId.Value)
             {
-                _context.UserNotifications.Add(new UserNotification
-                {
-                    UserId = article.AuthorId,
-                    Type = NotificationType.ContentRemoved,
-                    Message = "Twój artykuł został usunięty przez moderację.",
-                    Reason = string.IsNullOrWhiteSpace(reason) ? "Naruszenie regulaminu." : reason,
-                    CreatedAt = DateTime.Now
-                });
+                _notifications.NotifyUser(
+                    article.AuthorId,
+                    NotificationType.ContentRemoved,
+                    "Twój artykuł został usunięty przez moderację.",
+                    reason: string.IsNullOrWhiteSpace(reason) ? "Naruszenie regulaminu." : reason
+                );
             }
 
             await ResolveRelatedReportsAsync(ReportType.Article, article.Id);
@@ -185,7 +166,6 @@ namespace GameWiki.Services
         {
             var article = await _context.Articles.FindAsync(id);
             if (article == null) return null;
-
             article.IsVerified = true;
             await _context.SaveChangesAsync();
             return article;
@@ -196,14 +176,12 @@ namespace GameWiki.Services
             var article = await _context.Articles.FindAsync(id);
             if (article == null) return null;
 
-            _context.UserNotifications.Add(new UserNotification
-            {
-                UserId = article.AuthorId,
-                Type = NotificationType.ContentRemoved,
-                Message = "Twój artykuł został odrzucony przez moderację.",
-                Reason = string.IsNullOrWhiteSpace(reason) ? "Artykuł nie spełnia wymogów serwisu." : reason,
-                CreatedAt = DateTime.Now
-            });
+            _notifications.NotifyUser(
+                article.AuthorId,
+                NotificationType.ContentRemoved,
+                "Twój artykuł został odrzucony przez moderację.",
+                reason: string.IsNullOrWhiteSpace(reason) ? "Artykuł nie spełnia wymogów serwisu." : reason
+            );
 
             await ResolveRelatedReportsAsync(ReportType.Article, id);
             _context.Articles.Remove(article);
@@ -215,10 +193,10 @@ namespace GameWiki.Services
         {
             _context.Comments.Add(new Comment
             {
-                ArticleId = articleId,
-                UserId = userId,
-                Content = content.Trim(),
-                CreatedAt = DateTime.Now,
+                ArticleId       = articleId,
+                UserId          = userId,
+                Content         = content.Trim(),
+                CreatedAt       = DateTime.UtcNow,
                 ParentCommentId = parentCommentId
             });
             await _context.SaveChangesAsync();
@@ -231,39 +209,34 @@ namespace GameWiki.Services
                 .FirstOrDefaultAsync(c => c.Id == commentId);
         }
 
-        public async Task<bool> UpdateCommentAsync(Comment comment, string newContent, int editorId)
+        public async Task UpdateCommentAsync(Comment comment, string newContent, int editorId)
         {
-            bool isModEdit = comment.UserId != editorId;
-            comment.Content = newContent.Trim();
-            comment.UpdatedAt = DateTime.Now;
+            bool isModEdit  = comment.UserId != editorId;
+            comment.Content  = newContent.Trim();
+            comment.UpdatedAt = DateTime.UtcNow;
 
             if (isModEdit)
             {
-                _context.UserNotifications.Add(new UserNotification
-                {
-                    UserId = comment.UserId,
-                    Type = NotificationType.ContentEdited,
-                    Message = "Twój komentarz został zedytowany przez moderację.",
-                    CreatedAt = DateTime.Now
-                });
+                _notifications.NotifyUser(
+                    comment.UserId,
+                    NotificationType.ContentEdited,
+                    "Twój komentarz został zedytowany przez moderację."
+                );
             }
 
             await _context.SaveChangesAsync();
-            return isModEdit;
         }
 
         public async Task DeleteCommentAsync(Comment comment, int? moderatorId, string? reason)
         {
             if (moderatorId.HasValue && comment.UserId != moderatorId.Value)
             {
-                _context.UserNotifications.Add(new UserNotification
-                {
-                    UserId = comment.UserId,
-                    Type = NotificationType.ContentRemoved,
-                    Message = "Twój komentarz został usunięty przez moderację.",
-                    Reason = string.IsNullOrWhiteSpace(reason) ? "Naruszenie regulaminu." : reason,
-                    CreatedAt = DateTime.Now
-                });
+                _notifications.NotifyUser(
+                    comment.UserId,
+                    NotificationType.ContentRemoved,
+                    "Twój komentarz został usunięty przez moderację.",
+                    reason: string.IsNullOrWhiteSpace(reason) ? "Naruszenie regulaminu." : reason
+                );
             }
 
             await ResolveRelatedReportsAsync(ReportType.Comment, comment.Id);
@@ -277,30 +250,19 @@ namespace GameWiki.Services
                 .FirstOrDefaultAsync(r => r.CommentId == commentId && r.UserId == userId);
 
             if (existing == null)
-            {
                 _context.CommentReactions.Add(new CommentReaction
-                {
-                    CommentId = commentId,
-                    UserId = userId,
-                    Type = type
-                });
-            }
+                    { CommentId = commentId, UserId = userId, Type = type });
             else if (existing.Type == type)
-            {
                 _context.CommentReactions.Remove(existing);
-            }
             else
-            {
                 existing.Type = type;
-            }
 
             await _context.SaveChangesAsync();
         }
 
         public async Task<List<object>> SearchGamesAsync(string query)
         {
-            if (string.IsNullOrWhiteSpace(query))
-                return new List<object>();
+            if (string.IsNullOrWhiteSpace(query)) return new();
 
             return await _context.Games
                 .Where(g => g.Title.Contains(query))
@@ -313,39 +275,32 @@ namespace GameWiki.Services
         private async Task SaveBlocksAsync(int articleId, List<BlockInputDto>? blocks)
         {
             if (blocks == null) return;
-
             int order = 0;
+
             foreach (var blockDto in blocks)
             {
                 if (blockDto.Type == ArticleBlockType.Text && !string.IsNullOrWhiteSpace(blockDto.TextContent))
                 {
                     _context.ArticleBlocks.Add(new ArticleBlock
                     {
-                        ArticleId = articleId,
-                        Type = ArticleBlockType.Text,
-                        Content = blockDto.TextContent,
-                        Order = order++
+                        ArticleId = articleId, Type = ArticleBlockType.Text,
+                        Content   = blockDto.TextContent, Order = order++
                     });
                 }
                 else if (blockDto.Type == ArticleBlockType.Image)
                 {
                     string? url = null;
-
                     if (blockDto.ImageFile != null && blockDto.ImageFile.Length > 0)
                         url = await SaveImageAsync(blockDto.ImageFile);
                     else if (!string.IsNullOrWhiteSpace(blockDto.ExistingImageUrl))
                         url = blockDto.ExistingImageUrl;
 
                     if (url != null)
-                    {
                         _context.ArticleBlocks.Add(new ArticleBlock
                         {
-                            ArticleId = articleId,
-                            Type = ArticleBlockType.Image,
-                            Content = url,
-                            Order = order++
+                            ArticleId = articleId, Type = ArticleBlockType.Image,
+                            Content   = url, Order = order++
                         });
-                    }
                 }
             }
         }
@@ -355,9 +310,7 @@ namespace GameWiki.Services
             var reports = await _context.Reports
                 .Where(r => r.Type == type && r.TargetId == targetId && r.Status == ReportStatus.Pending)
                 .ToListAsync();
-
-            foreach (var r in reports)
-                r.Status = ReportStatus.Resolved;
+            foreach (var r in reports) r.Status = ReportStatus.Resolved;
         }
 
         private async Task<string> SaveImageAsync(IFormFile file)

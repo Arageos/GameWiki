@@ -11,40 +11,34 @@ namespace GameWiki.Controllers
     {
         private readonly GameWikiDbContext _context;
         private readonly GameService _gameService;
-        private readonly ArticleService _articleService;
+        private readonly NotificationService _notifications;
 
-        public GamesController(GameWikiDbContext context, GameService gameService, ArticleService articleService)
+        public GamesController(GameWikiDbContext context, GameService gameService, NotificationService notifications)
         {
-            _context = context;
-            _gameService = gameService;
-            _articleService = articleService;
+            _context       = context;
+            _gameService   = gameService;
+            _notifications = notifications;
         }
 
         public async Task<IActionResult> Index(string? search, int? genreId, int? platformId)
-        {
-            var vm = await _gameService.GetGameIndexViewModelAsync(search, genreId, platformId);
-            return View(vm);
-        }
+            => View(await _gameService.GetGameIndexViewModelAsync(search, genreId, platformId));
 
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null) return NotFound();
-
             var game = await _context.Games
                 .Include(g => g.Reviews)
                 .Where(g => g.Id == id)
                 .Select(g => new GameDto
                 {
-                    Id = g.Id,
-                    Title = g.Title,
-                    Description = g.Description,
-                    ReleaseDate = g.ReleaseDate,
-                    BackgroundImage = g.BackgroundImage,
-                    RawgRating = g.RawgRating,
-                    RawgRatingsCount = g.RawgRatingsCount,
-                    LocalRating = g.Reviews.Any()
-                        ? Math.Round(g.Reviews.Average(r => r.Rating), 1)
-                        : null,
+                    Id                = g.Id,
+                    Title             = g.Title,
+                    Description       = g.Description,
+                    ReleaseDate       = g.ReleaseDate,
+                    BackgroundImage   = g.BackgroundImage,
+                    RawgRating        = g.RawgRating,
+                    RawgRatingsCount  = g.RawgRatingsCount,
+                    LocalRating       = g.Reviews.Any() ? Math.Round(g.Reviews.Average(r => r.Rating), 1) : null,
                     LocalRatingsCount = g.Reviews.Count()
                 })
                 .FirstOrDefaultAsync();
@@ -56,24 +50,16 @@ namespace GameWiki.Controllers
         [Authorize(Roles = "Admin,Moderator")]
         public IActionResult Create() => View();
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize(Roles = "Admin,Moderator")]
+        [HttpPost, Authorize(Roles = "Admin,Moderator"), ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(CreateGameDto dto)
         {
             if (!ModelState.IsValid) return View(dto);
 
-            var game = new Game
-            {
-                Title       = dto.Title,
-                Description = dto.Description,
-                ReleaseDate = dto.ReleaseDate
-            };
-
+            var game = new Game { Title = dto.Title, Description = dto.Description, ReleaseDate = dto.ReleaseDate };
             _context.Add(game);
             await _context.SaveChangesAsync();
 
-            await _articleService.NotifyModsAsync(
+            await _notifications.NotifyModsAsync(
                 NotificationType.NewGame,
                 $"Nowa gra dodana do bazy: {game.Title}.",
                 $"/Games/Details/{game.Id}"
@@ -89,32 +75,18 @@ namespace GameWiki.Controllers
             if (id == null) return NotFound();
             var game = await _context.Games.FindAsync(id);
             if (game == null) return NotFound();
-
-            return View(new UpdateGameDto
-            {
-                Id          = game.Id,
-                Title       = game.Title,
-                Description = game.Description,
-                ReleaseDate = game.ReleaseDate
-            });
+            return View(new UpdateGameDto { Id = game.Id, Title = game.Title, Description = game.Description, ReleaseDate = game.ReleaseDate });
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize(Roles = "Admin,Moderator")]
+        [HttpPost, Authorize(Roles = "Admin,Moderator"), ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, UpdateGameDto dto)
         {
             if (id != dto.Id) return NotFound();
             if (!ModelState.IsValid) return View(dto);
-
             var game = await _context.Games.FindAsync(id);
             if (game == null) return NotFound();
-
-            game.Title       = dto.Title;
-            game.Description = dto.Description;
-            game.ReleaseDate = dto.ReleaseDate;
+            game.Title = dto.Title; game.Description = dto.Description; game.ReleaseDate = dto.ReleaseDate;
             await _context.SaveChangesAsync();
-
             return RedirectToAction(nameof(Index));
         }
 
@@ -122,33 +94,23 @@ namespace GameWiki.Controllers
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null) return NotFound();
-            var game = await _context.Games
-                .Where(g => g.Id == id)
+            var game = await _context.Games.Where(g => g.Id == id)
                 .Select(g => new GameDto { Id = g.Id, Title = g.Title, Description = g.Description, ReleaseDate = g.ReleaseDate })
                 .FirstOrDefaultAsync();
             if (game == null) return NotFound();
             return View(game);
         }
 
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        [Authorize(Roles = "Admin,Moderator")]
+        [HttpPost, ActionName("Delete"), Authorize(Roles = "Admin,Moderator"), ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var game = await _context.Games.FindAsync(id);
-            if (game != null)
-            {
-                _context.Games.Remove(game);
-                await _context.SaveChangesAsync();
-            }
+            if (game != null) { _context.Games.Remove(game); await _context.SaveChangesAsync(); }
             return RedirectToAction(nameof(Index));
         }
 
         [HttpGet]
         public async Task<IActionResult> SearchTitles(string term)
-        {
-            var titles = await _gameService.GetGameTitlesAsync(term);
-            return Json(titles);
-        }
+            => Json(await _gameService.GetGameTitlesAsync(term));
     }
 }

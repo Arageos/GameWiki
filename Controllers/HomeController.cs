@@ -12,38 +12,33 @@ namespace GameWiki.Controllers
 
         public HomeController(ILogger<HomeController> logger, GameWikiDbContext context)
         {
-            _logger = logger;
+            _logger  = logger;
             _context = context;
         }
 
         public async Task<IActionResult> Index()
         {
-            ViewBag.GamesCount = await _context.Games.CountAsync();
+            ViewBag.GamesCount    = await _context.Games.CountAsync();
             ViewBag.ArticlesCount = await _context.Articles.CountAsync();
-            ViewBag.ReviewsCount = await _context.Reviews.CountAsync();
+            ViewBag.ReviewsCount  = await _context.Reviews.CountAsync();
 
             ViewBag.FeaturedGames = await _context.Games
                 .Where(g => g.BackgroundImage != null)
-                .OrderBy(_ => Guid.NewGuid()) 
+                .OrderBy(_ => Guid.NewGuid())
                 .Take(6)
                 .Select(g => new { g.Id, g.Title, g.BackgroundImage })
                 .ToListAsync();
-            ViewBag.Genres = await _context.Genres
-                .OrderBy(g => g.Name)
-                .ToListAsync();
+
+            ViewBag.Genres = await _context.Genres.OrderBy(g => g.Name).ToListAsync();
 
             return View();
         }
 
-        public IActionResult Privacy()
-        {
-            return View();
-        }
+        public IActionResult Privacy() => View();
+        public IActionResult Terms() => View();
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
-        {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
-        }
+            => View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
     }
 }
