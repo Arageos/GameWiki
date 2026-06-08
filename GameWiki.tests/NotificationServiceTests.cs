@@ -63,7 +63,7 @@ public class NotificationServiceTests
 
         await service.NotifyModsAsync(NotificationType.NewReport, "Nowe zgłoszenie");
 
-        var notifications = await db.UserNotifications.ToListAsync();
+        var notifications = db.UserNotifications.Local.ToList();
         Assert.Equal(2, notifications.Count);
         Assert.Contains(notifications, n => n.UserId == mod.Id);
         Assert.Contains(notifications, n => n.UserId == admin.Id);

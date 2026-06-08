@@ -2,6 +2,13 @@
 
 Aplikacja webowa typu wiki dla graczy, umożliwiająca przeglądanie gier, pisanie recenzji i artykułów, zarządzanie kolekcjami ulubionych gier oraz moderowanie treści.
 
+## Wersja produkcyjna
+
+Aplikacja dostępna publicznie pod adresem:
+**[https://gamewiki-app.azurewebsites.net](https://gamewiki-app.azurewebsites.net)**
+
+Hostowana na Azure App Service, baza danych SQL Server.
+
 ## Technologie i biblioteki
 
 | Biblioteka | Wersja |
@@ -16,29 +23,33 @@ Aplikacja webowa typu wiki dla graczy, umożliwiająca przeglądanie gier, pisan
 | Microsoft.AspNetCore.Http | 2.3.9 |
 | Microsoft.AspNetCore.Session | 2.3.9 |
 | Microsoft.VisualStudio.Web.CodeGeneration.Design | 9.0.12 |
+| xUnit | 2.9.2 |
+| Moq | 4.20.72 |
+| Microsoft.EntityFrameworkCore.InMemory | 9.0.16 |
 
 Zewnętrzne API: [RAWG Video Games Database API](https://rawg.io/apidocs)
 
-## Wymagania
+## Uruchomienie lokalne
+
+> **Uwaga:** Lokalne uruchomienie wymaga dostępu do bazy danych oraz skonfigurowania zapory sieciowej. Zalecane jest korzystanie z wersji produkcyjnej pod adresem powyżej.
+
+### Wymagania
 
 - .NET 9.0 SDK
 - SQL Server (lokalny lub zdalny, port 1433)
+- Dostęp do instancji bazy danych (wymagane dodanie adresu IP do reguł zapory)
 
-## Konfiguracja
+### Konfiguracja
 
-### 1. Baza danych
-
-W pliku `appsettings.json` ustaw connection string do swojej instancji SQL Server:
+W pliku `appsettings.json` ustaw connection string:
 
 ```json
 "ConnectionStrings": {
-  "DefaultConnection": "Server=localhost,1433;Database=GameWikiDb;User Id=TWOJ_LOGIN;Password=TWOJE_HASLO;TrustServerCertificate=True;"
+  "DefaultConnection": "Server=ADRES_SERWERA,1433;Database=GameWikiDb;User Id=TWOJ_LOGIN;Password=TWOJE_HASLO;TrustServerCertificate=True;"
 }
 ```
 
-### 2. Klucz API RAWG
-
-W pliku `appsettings.json` (lub `appsettings.Development.json`) ustaw swój klucz API RAWG:
+Klucz API RAWG (uzyskasz bezpłatnie na [rawg.io](https://rawg.io/apidocs)):
 
 ```json
 "Rawg": {
@@ -46,26 +57,16 @@ W pliku `appsettings.json` (lub `appsettings.Development.json`) ustaw swój kluc
 }
 ```
 
-Klucz API można uzyskać bezpłatnie na [rawg.io](https://rawg.io/apidocs).
-
-## Instalacja i uruchomienie
+### Uruchomienie
 
 ```bash
-# 1. Sklonuj repozytorium
 git clone <URL_REPOZYTORIUM>
 cd GameWiki
-
-# 2. Przejdź do katalogu projektu
-cd GameWiki
-
-# 3. Zastosuj migracje bazy danych
 dotnet ef database update
-
-# 4. Uruchom aplikację
 dotnet run
 ```
 
-Aplikacja domyślnie dostępna pod adresem `https://localhost:5001`.
+Lub otwórz solution w Visual Studio i uruchom przez IIS Express (F5).
 
 ## Role użytkowników
 
@@ -81,7 +82,8 @@ GameWiki/
 ├── DTOs/             # Obiekty transferu danych
 ├── Data/             # DbContext (EF Core)
 ├── Models/           # Modele / encje
-├── Services/         # Logika biznesowa (GameService, RawgService)
+├── Services/         # Logika biznesowa
 ├── Views/            # Widoki Razor
-└── wwwroot/          # Pliki statyczne (CSS, JS, obrazy)
+├── wwwroot/          # Pliki statyczne (CSS, JS, obrazy)
+└── GameWiki.tests/   # Testy jednostkowe (xUnit + Moq)
 ```
