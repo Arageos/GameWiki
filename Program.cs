@@ -1,3 +1,4 @@
+using GameWiki.Data;
 using GameWiki.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
@@ -30,8 +31,18 @@ builder.Services.AddScoped<FavoriteService>();
 builder.Services.AddScoped<GameService>();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<DataSeeder>();
 
 var app = builder.Build();
+
+// GENEROWANIE DANYCH
+// DODAC 10 GIER I U¯YÆ
+//PO URUCHOMIENIU ZAKOMENTOWAC I NIE PONAWIAC
+//using (var scope = app.Services.CreateScope())
+//{
+//    var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
+//    await seeder.SeedAsync();
+//}
 
 if (!app.Environment.IsDevelopment())
 {
