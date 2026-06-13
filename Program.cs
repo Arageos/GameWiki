@@ -36,7 +36,6 @@ builder.Services.AddScoped<DataSeeder>();
 var app = builder.Build();
 
 // GENEROWANIE DANYCH
-// DODAC 10 GIER I U¯YÆ
 //PO URUCHOMIENIU ZAKOMENTOWAC I NIE PONAWIAC
 //using (var scope = app.Services.CreateScope())
 //{

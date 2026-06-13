@@ -93,5 +93,84 @@ namespace GameWiki.Controllers
             TempData["ImportSuccess"] = $"Zaimportowano: {game.Title}";
             return RedirectToAction(nameof(Index));
         }
+
+        // GET: /GamesImport/BulkImport
+        [Authorize(Roles = "Admin,Moderator")]
+        public async Task<IActionResult> BulkImport()
+        {
+            int imported = 0;
+            int skipped = 0;
+            int page = 1;
+            int pageSize = 40; // max RAWG pozwala 40
+            int target = 1000;
+
+            while (imported < target)
+            {
+                var result = await _rawg.GetGamesAsync(page, pageSize);
+                if (result?.Results == null || !result.Results.Any()) break;
+
+                foreach (var game in result.Results)
+                {
+                    if (imported >= target) break;
+
+                    var exists = await _context.Games.AnyAsync(g => g.Title == game.Name);
+                    if (exists) { skipped++; continue; }
+
+                    // Pobierz szczegóły (opis + oceny)
+                    var details = await _rawg.GetGameDetailsAsync(game.Id);
+                    await Task.Delay(100); // throttling żeby nie zbombardować API
+
+                    DateTime releaseDate = DateTime.MinValue;
+                    if (!string.IsNullOrEmpty(details?.Released))
+                        DateTime.TryParse(details.Released, out releaseDate);
+
+                    var newGame = new Game
+                    {
+                        Title = game.Name,
+                        Description = details?.DescriptionRaw ?? "Brak opisu.",
+                        ReleaseDate = releaseDate,
+                        BackgroundImage = details?.BackgroundImage ?? game.BackgroundImage,
+                        RawgRating = details?.Rating,
+                        RawgRatingsCount = details?.RatingsCount,
+                        GameGenres = new List<GameGenre>(),
+                        GamePlatforms = new List<GamePlatform>()
+                    };
+
+                    // Gatunki
+                    if (game.Genres != null)
+                    {
+                        foreach (var g in game.Genres)
+                        {
+                            var genre = await _context.Genres.FirstOrDefaultAsync(x => x.Name == g.Name)
+                                        ?? new Genre { Name = g.Name };
+                            if (genre.Id == 0) _context.Genres.Add(genre);
+                            newGame.GameGenres.Add(new GameGenre { Genre = genre });
+                        }
+                    }
+
+                    // Platformy
+                    if (game.Platforms != null)
+                    {
+                        foreach (var p in game.Platforms)
+                        {
+                            var platform = await _context.Platforms.FirstOrDefaultAsync(x => x.Name == p.Platform.Name)
+                                           ?? new Platform { Name = p.Platform.Name };
+                            if (platform.Id == 0) _context.Platforms.Add(platform);
+                            newGame.GamePlatforms.Add(new GamePlatform { Platform = platform });
+                        }
+                    }
+
+                    _context.Games.Add(newGame);
+                    await _context.SaveChangesAsync();
+                    imported++;
+                }
+
+                page++;
+                if (result.Next == null) break;
+            }
+
+            TempData["ImportSuccess"] = $"Zaimportowano {imported} gier, pominięto {skipped} duplikatów.";
+            return RedirectToAction(nameof(Index));
+        }
     }
 }

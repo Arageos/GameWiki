@@ -15,65 +15,82 @@ namespace GameWiki.Data
 
         public async Task SeedAsync()
         {
-            await SeedRolesAsync();
+            //await SeedRolesAsync();
             await SeedUsersAsync();
             await SeedReviewsAsync();
-            await SeedArticlesAsync();
+            await SeedArticlesAndCommentsAsync();
             await SeedFavoriteListsAsync();
             await SeedReportsAsync();
+            await SeedNotificationsAsync();
             Console.WriteLine("✅ Seeding zakończony!");
         }
 
-        private async Task SeedRolesAsync()
-        {
-            if (await _context.Roles.AnyAsync()) return;
+        // ─────────────────────────────────────────
+        //private async Task SeedRolesAsync()
+        //{
+        //    if (await _context.Roles.AnyAsync()) return;
+        //    _context.Roles.AddRange(
+        //        new Role { Name = "User" },
+        //        new Role { Name = "Moderator" },
+        //        new Role { Name = "Admin" }
+        //    );
+        //    await _context.SaveChangesAsync();
+        //    Console.WriteLine("✅ Role dodane");
+        //}
 
-            _context.Roles.AddRange(
-                new Role { Name = "User" },
-                new Role { Name = "Moderator" },
-                new Role { Name = "Admin" }
-            );
-            await _context.SaveChangesAsync();
-            Console.WriteLine("✅ Role dodane");
-        }
-
+        // ─────────────────────────────────────────
         private async Task SeedUsersAsync()
         {
-            if (await _context.Users.CountAsync() > 3) return;
+            if (await _context.Users.CountAsync() > 10) return;
 
             var userRole = await _context.Roles.FirstAsync(r => r.Name == "User");
+            var hash = BCrypt.Net.BCrypt.HashPassword("Test1234!");
 
             var faker = new Faker<User>("pl")
-                .RuleFor(u => u.Username, f => f.Internet.UserName())
+                .RuleFor(u => u.Username, f => f.Internet.UserName() + f.Random.Number(1000, 9999))
                 .RuleFor(u => u.Email, (f, u) => f.Internet.Email(u.Username))
-                .RuleFor(u => u.PasswordHash, f => BCrypt.Net.BCrypt.HashPassword("Test1234!"))
+                .RuleFor(u => u.PasswordHash, _ => hash)
                 .RuleFor(u => u.Description, f => f.Lorem.Sentence())
                 .RuleFor(u => u.ProfilePictureUrl, f => f.Internet.Avatar())
-                .RuleFor(u => u.IsBanned, f => false);
+                .RuleFor(u => u.IsBanned, f => f.Random.Bool(0.03f));
 
-            var users = faker.Generate(20);
+            var users = faker.Generate(1000);
 
-            foreach (var user in users)
+            // Batch insert po 200
+            foreach (var batch in users.Chunk(200))
             {
-                _context.Users.Add(user);
+                await _context.Users.AddRangeAsync(batch);
                 await _context.SaveChangesAsync();
-                _context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = userRole.Id });
             }
 
-            await _context.SaveChangesAsync();
-            Console.WriteLine("✅ Użytkownicy dodani (hasło: Test1234!)");
+            // UserRoles batch
+            var allUsers = await _context.Users.Select(u => u.Id).ToListAsync();
+            var userRoles = allUsers.Select(id => new UserRole
+            {
+                UserId = id,
+                RoleId = userRole.Id
+            }).ToList();
+
+            foreach (var batch in userRoles.Chunk(500))
+            {
+                await _context.UserRoles.AddRangeAsync(batch);
+                await _context.SaveChangesAsync();
+            }
+
+            Console.WriteLine($"✅ 1000 użytkowników dodanych (hasło: Test1234!)");
         }
 
+        // ─────────────────────────────────────────
         private async Task SeedReviewsAsync()
         {
             if (await _context.Reviews.AnyAsync()) return;
 
-            var games = await _context.Games.ToListAsync();
-            var users = await _context.Users.ToListAsync();
+            var gameIds = await _context.Games.Select(g => g.Id).ToListAsync();
+            var userIds = await _context.Users.Select(u => u.Id).ToListAsync();
 
-            if (!games.Any() || !users.Any()) return;
+            if (!gameIds.Any() || !userIds.Any()) return;
 
-            var reviewContents = new[]
+            var contents = new[]
             {
                 "Świetna gra, polecam każdemu!",
                 "Grafika na wysokim poziomie, ale fabuła mogłaby być lepsza.",
@@ -85,166 +102,312 @@ namespace GameWiki.Data
                 "Mechaniki walki są rewelacyjne.",
                 "Trochę za dużo bugów na premierę.",
                 "Klasyk gatunku, must-play!",
-                null, null, null // część bez recenzji (tylko ocena)
+                "Zdecydowanie przereklamowana produkcja.",
+                "Genialna fabuła, słaba optymalizacja.",
+                "Multiplayer wciąga na długie godziny.",
+                "Kampania dla jednego gracza to majstersztyk.",
+                "Świetny soundtrack, przeciętna grywalność.",
+                "Warta swojej ceny w promocji.",
+                "Najlepsza gra tego roku bez dwóch zdań.",
+                "Rozczarowanie po świetnej poprzedniej części.",
+                "Idealna na wieczór z przyjaciółmi.",
+                null, null // część tylko z oceną
             };
 
             var random = new Random(42);
             var usedCombos = new HashSet<(int, int)>();
+            var reviews = new List<Review>();
 
-            foreach (var game in games)
+            // 5 recenzji na grę = ~5 005 łącznie
+            foreach (var gameId in gameIds)
             {
-                var reviewCount = random.Next(2, 8);
-                var shuffledUsers = users.OrderBy(_ => random.Next()).Take(reviewCount).ToList();
+                var reviewCount = random.Next(4, 7); // 4-6 na grę
+                var shuffledUsers = userIds
+                    .OrderBy(_ => random.Next())
+                    .Take(reviewCount)
+                    .ToList();
 
-                foreach (var user in shuffledUsers)
+                foreach (var userId in shuffledUsers)
                 {
-                    if (usedCombos.Contains((game.Id, user.Id))) continue;
-                    usedCombos.Add((game.Id, user.Id));
+                    if (usedCombos.Contains((gameId, userId))) continue;
+                    usedCombos.Add((gameId, userId));
 
-                    _context.Reviews.Add(new Review
+                    reviews.Add(new Review
                     {
-                        GameId = game.Id,
-                        UserId = user.Id,
+                        GameId = gameId,
+                        UserId = userId,
                         Rating = random.Next(1, 6),
-                        Content = reviewContents[random.Next(reviewContents.Length)],
-                        CreatedAt = DateTime.Now.AddDays(-random.Next(1, 365)),
-                        IsVerified = random.Next(0, 2) == 1
+                        Content = contents[random.Next(contents.Length)],
+                        CreatedAt = DateTime.Now.AddDays(-random.Next(1, 730)),
+                        IsVerified = random.Next(0, 10) > 1
                     });
                 }
             }
 
-            await _context.SaveChangesAsync();
-            Console.WriteLine("✅ Recenzje dodane");
+            // Batch insert po 500
+            int total = 0;
+            foreach (var batch in reviews.Chunk(500))
+            {
+                await _context.Reviews.AddRangeAsync(batch);
+                await _context.SaveChangesAsync();
+                total += batch.Length;
+                Console.WriteLine($"  → Recenzje: {total}/{reviews.Count}");
+            }
+
+            Console.WriteLine($"✅ {reviews.Count} recenzji dodanych");
         }
 
-        private async Task SeedArticlesAsync()
+        // ─────────────────────────────────────────
+        private async Task SeedArticlesAndCommentsAsync()
         {
             if (await _context.Articles.AnyAsync()) return;
 
-            var games = await _context.Games.ToListAsync();
-            var users = await _context.Users.ToListAsync();
+            var gameIds = await _context.Games
+                .Select(g => new { g.Id, g.Title })
+                .ToListAsync();
+            var userIds = await _context.Users.Select(u => u.Id).ToListAsync();
 
-            if (!games.Any() || !users.Any()) return;
+            if (!gameIds.Any() || !userIds.Any()) return;
 
             var faker = new Faker("pl");
             var random = new Random(42);
 
-            foreach (var game in games.Take(10))
+            var titleTemplates = new[]
             {
-                var author = users[random.Next(users.Count)];
+                "Przewodnik po grze {0}",
+                "Poradnik dla początkujących — {0}",
+                "Historia i lore — {0}",
+                "Sekrety i easter eggi w {0}",
+                "Analiza mechanik gry {0}",
+                "Poradnik do trofeów — {0}",
+                "Najlepsze buildy w {0}",
+                "Recenzja — {0}",
+                "Wszystko o {0}",
+                "Kompletny poradnik — {0}"
+            };
 
-                var article = new Article
+            int totalArticles = 0;
+            int totalComments = 0;
+
+            // Przetwarzaj po 100 gier na raz
+            foreach (var gameBatch in gameIds.Chunk(100))
+            {
+                var articles = new List<Article>();
+
+                foreach (var game in gameBatch)
                 {
-                    GameId = game.Id,
-                    AuthorId = author.Id,
-                    Title = $"Przewodnik po grze {game.Title}",
-                    IsVerified = true,
-                    CreatedAt = DateTime.Now.AddDays(-random.Next(1, 200)),
-                    Blocks = new List<ArticleBlock>
+                    var articleCount = random.Next(1, 3); // 1-2 artykuły
+
+                    for (int i = 0; i < articleCount; i++)
                     {
-                        new ArticleBlock
+                        var title = string.Format(
+                            titleTemplates[random.Next(titleTemplates.Length)],
+                            game.Title);
+
+                        articles.Add(new Article
                         {
-                            Type = ArticleBlockType.Text,
-                            Content = faker.Lorem.Paragraphs(2),
-                            Order = 1
-                        },
-                        new ArticleBlock
-                        {
-                            Type = ArticleBlockType.Text,
-                            Content = faker.Lorem.Paragraphs(2),
-                            Order = 2
-                        }
+                            GameId = game.Id,
+                            AuthorId = userIds[random.Next(userIds.Count)],
+                            Title = title,
+                            IsVerified = random.Next(0, 10) > 2,
+                            CreatedAt = DateTime.Now.AddDays(-random.Next(1, 500)),
+                            Blocks = new List<ArticleBlock>
+                            {
+                                new ArticleBlock
+                                {
+                                    Type = ArticleBlockType.Text,
+                                    Content = faker.Lorem.Paragraphs(random.Next(2, 4)),
+                                    Order = 1
+                                },
+                                new ArticleBlock
+                                {
+                                    Type = ArticleBlockType.Text,
+                                    Content = faker.Lorem.Paragraphs(random.Next(2, 4)),
+                                    Order = 2
+                                }
+                            }
+                        });
                     }
-                };
-
-                _context.Articles.Add(article);
-                await _context.SaveChangesAsync();
-
-                // Dodaj komentarze do artykułu
-                var commentCount = random.Next(2, 6);
-                for (int i = 0; i < commentCount; i++)
-                {
-                    _context.Comments.Add(new Comment
-                    {
-                        ArticleId = article.Id,
-                        UserId = users[random.Next(users.Count)].Id,
-                        Content = faker.Lorem.Sentence(),
-                        CreatedAt = DateTime.Now.AddDays(-random.Next(1, 100)),
-                        IsVerified = true
-                    });
                 }
+
+                await _context.Articles.AddRangeAsync(articles);
                 await _context.SaveChangesAsync();
+                totalArticles += articles.Count;
+
+                // Komentarze do tych artykułów
+                var articleIds = articles.Select(a => a.Id).ToList();
+                var comments = new List<Comment>();
+
+                foreach (var articleId in articleIds)
+                {
+                    var commentCount = random.Next(5, 11); // 5-10 komentarzy
+
+                    for (int i = 0; i < commentCount; i++)
+                    {
+                        comments.Add(new Comment
+                        {
+                            ArticleId = articleId,
+                            UserId = userIds[random.Next(userIds.Count)],
+                            Content = faker.Lorem.Sentence(random.Next(5, 25)),
+                            CreatedAt = DateTime.Now.AddDays(-random.Next(1, 300)),
+                            IsVerified = random.Next(0, 10) > 1,
+                            ParentCommentId = null
+                        });
+                    }
+                }
+
+                await _context.Comments.AddRangeAsync(comments);
+                await _context.SaveChangesAsync();
+                totalComments += comments.Count;
+
+                Console.WriteLine($"  → Artykuły: {totalArticles} | Komentarze: {totalComments}");
             }
 
-            Console.WriteLine("✅ Artykuły i komentarze dodane");
+            Console.WriteLine($"✅ {totalArticles} artykułów i {totalComments} komentarzy dodanych");
         }
 
+        // ─────────────────────────────────────────
         private async Task SeedFavoriteListsAsync()
         {
             if (await _context.FavoriteLists.AnyAsync()) return;
 
-            var users = await _context.Users.ToListAsync();
-            var games = await _context.Games.ToListAsync();
+            var userIds = await _context.Users.Select(u => u.Id).ToListAsync();
+            var gameIds = await _context.Games.Select(g => g.Id).ToListAsync();
 
-            if (!users.Any() || !games.Any()) return;
+            if (!userIds.Any() || !gameIds.Any()) return;
 
             var random = new Random(42);
-            var listNames = new[] { "Chcę zagrać", "Już grałem", "Polecam znajomym", "Ulubione" };
-
-            foreach (var user in users.Take(10))
+            var listNames = new[]
             {
-                var list = new FavoriteList
-                {
-                    UserId = user.Id,
-                    Name = listNames[random.Next(listNames.Length)],
-                    FavoriteGames = new List<FavoriteGame>()
-                };
+                "Chcę zagrać", "Już grałem", "Polecam znajomym",
+                "Ulubione", "Arcydzieła", "Do sprawdzenia", "Top 10"
+            };
 
-                var randomGames = games.OrderBy(_ => random.Next()).Take(random.Next(2, 6)).ToList();
-                foreach (var game in randomGames)
+            var lists = new List<FavoriteList>();
+
+            foreach (var userId in userIds)
+            {
+                var listCount = random.Next(1, 3); // 1-2 listy
+                for (int i = 0; i < listCount; i++)
                 {
-                    list.FavoriteGames.Add(new FavoriteGame { GameId = game.Id });
+                    var randomGames = gameIds
+                        .OrderBy(_ => random.Next())
+                        .Take(random.Next(3, 10))
+                        .Select(gId => new FavoriteGame { GameId = gId })
+                        .ToList();
+
+                    lists.Add(new FavoriteList
+                    {
+                        UserId = userId,
+                        Name = listNames[random.Next(listNames.Length)],
+                        FavoriteGames = randomGames
+                    });
                 }
-
-                _context.FavoriteLists.Add(list);
             }
 
-            await _context.SaveChangesAsync();
-            Console.WriteLine("✅ Listy ulubionych dodane");
+            foreach (var batch in lists.Chunk(200))
+            {
+                await _context.FavoriteLists.AddRangeAsync(batch);
+                await _context.SaveChangesAsync();
+            }
+
+            Console.WriteLine($"✅ {lists.Count} list ulubionych dodanych");
         }
 
+        // ─────────────────────────────────────────
         private async Task SeedReportsAsync()
         {
             if (await _context.Reports.AnyAsync()) return;
 
-            var users = await _context.Users.ToListAsync();
-            if (users.Count < 2) return;
+            var userIds = await _context.Users.Select(u => u.Id).ToListAsync();
+            var reviewIds = await _context.Reviews.Select(r => r.Id).ToListAsync();
+            var commentIds = await _context.Comments.Select(c => c.Id).ToListAsync();
+
+            if (userIds.Count < 2) return;
 
             var random = new Random(42);
             var reasons = new[]
             {
-                "Spam i reklamy",
-                "Nieodpowiednia treść",
-                "Fałszywe informacje",
-                "Obraźliwy język",
-                "Naruszenie regulaminu"
+                "Spam i reklamy", "Nieodpowiednia treść",
+                "Fałszywe informacje", "Obraźliwy język",
+                "Naruszenie regulaminu", "Mowa nienawiści",
+                "Treści dla dorosłych", "Wprowadzanie w błąd"
             };
 
-            for (int i = 0; i < 10; i++)
+            var reports = new List<Report>();
+
+            for (int i = 0; i < 500; i++)
             {
-                _context.Reports.Add(new Report
+                var type = (ReportType)random.Next(0, 4);
+                var targetId = type switch
                 {
-                    ReporterId = users[random.Next(users.Count)].Id,
-                    Type = (ReportType)random.Next(0, 4),
-                    TargetId = random.Next(1, 10),
+                    ReportType.Review => reviewIds.Any() ? reviewIds[random.Next(reviewIds.Count)] : 1,
+                    ReportType.Comment => commentIds.Any() ? commentIds[random.Next(commentIds.Count)] : 1,
+                    _ => userIds[random.Next(userIds.Count)]
+                };
+
+                reports.Add(new Report
+                {
+                    ReporterId = userIds[random.Next(userIds.Count)],
+                    Type = type,
+                    TargetId = targetId,
                     Reason = reasons[random.Next(reasons.Length)],
-                    Status = ReportStatus.Pending,
-                    CreatedAt = DateTime.Now.AddDays(-random.Next(1, 60))
+                    Status = (ReportStatus)random.Next(0, 3),
+                    CreatedAt = DateTime.Now.AddDays(-random.Next(1, 180))
                 });
             }
 
+            await _context.Reports.AddRangeAsync(reports);
             await _context.SaveChangesAsync();
-            Console.WriteLine("✅ Zgłoszenia dodane");
+            Console.WriteLine($"✅ {reports.Count} zgłoszeń dodanych");
+        }
+
+        // ─────────────────────────────────────────
+        private async Task SeedNotificationsAsync()
+        {
+            if (await _context.UserNotifications.AnyAsync()) return;
+
+            var userIds = await _context.Users.Select(u => u.Id).ToListAsync();
+            if (!userIds.Any()) return;
+
+            var random = new Random(42);
+            var messages = new[]
+            {
+                "Twoja recenzja została zweryfikowana.",
+                "Ktoś skomentował Twój artykuł.",
+                "Twoje zgłoszenie zostało rozpatrzone.",
+                "Nowa odpowiedź na Twój komentarz.",
+                "Twój artykuł oczekuje na weryfikację.",
+                "Zostałeś wymieniony w komentarzu.",
+                "Twoja recenzja otrzymała reakcję.",
+                "Nowy artykuł o grze z Twojej listy ulubionych.",
+                "Twoje konto zostało zweryfikowane."
+            };
+
+            var notifications = new List<UserNotification>();
+
+            foreach (var userId in userIds)
+            {
+                var count = random.Next(2, 8);
+                for (int i = 0; i < count; i++)
+                {
+                    notifications.Add(new UserNotification
+                    {
+                        UserId = userId,
+                        Message = messages[random.Next(messages.Length)],
+                        IsRead = random.Next(0, 10) > 4,
+                        CreatedAt = DateTime.Now.AddDays(-random.Next(1, 90))
+                    });
+                }
+            }
+
+            foreach (var batch in notifications.Chunk(500))
+            {
+                await _context.UserNotifications.AddRangeAsync(batch);
+                await _context.SaveChangesAsync();
+            }
+
+            Console.WriteLine($"✅ {notifications.Count} powiadomień dodanych");
         }
     }
 }
